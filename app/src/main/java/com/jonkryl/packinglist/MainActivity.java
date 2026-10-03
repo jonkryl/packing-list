@@ -1,6 +1,5 @@
 package com.jonkryl.packinglist;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.*;
 import android.graphics.Color;
@@ -10,6 +9,8 @@ import android.os.*;
 import android.text.InputType;
 import android.view.*;
 import android.widget.*;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.*;
@@ -20,7 +21,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 /** All product state is persisted by the repository before a new UI state is shown. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends ComponentActivity {
     private static final int INK=0xff193a38, TEAL=0xff176b5a, MUTED=0xff526b67, PAPER=0xfff4f6f1;
     private PackingRepository repository;
     private SQLitePersistence persistence;
@@ -35,6 +36,7 @@ public final class MainActivity extends Activity {
     private BannerController banner;
     private PackingRepository.UndoToken undo;
     private boolean english;
+    private OnBackPressedCallback tripBack;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -42,6 +44,10 @@ public final class MainActivity extends Activity {
         persistence=new SQLitePersistence(this);repository=new PackingRepository(persistence);
         if(state!=null){ tripId=state.getLong("trip",-1); remaining=state.getBoolean("remaining"); grouping=Grouping.valueOf(state.getString("group","NONE")); }
         else tripId=getPreferences(0).getLong("trip",-1);
+        tripBack=new OnBackPressedCallback(tripId>=0){
+            @Override public void handleOnBackPressed(){goHome();}
+        };
+        getOnBackPressedDispatcher().addCallback(this,tripBack);
         root=column(); root.setBackgroundColor(PAPER);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{androidx.core.graphics.Insets s=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(s.left,s.top,s.right,s.bottom);return insets;});
         LinearLayout bar=row(); bar.setPadding(dp(12),dp(6),dp(12),dp(6));
@@ -60,7 +66,6 @@ public final class MainActivity extends Activity {
     @Override protected void onStop(){if(banner!=null)banner.onStop();super.onStop();}
     @Override protected void onDestroy(){if(banner!=null)banner.destroy();if(persistence!=null)persistence.close();super.onDestroy();}
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putLong("trip",tripId);b.putBoolean("remaining",remaining);b.putString("group",grouping.name());}
-    @Override public void onBackPressed(){if(tripId>=0)goHome();else super.onBackPressed();}
     private String t(String ru,String en){return english?en:ru;}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
@@ -75,6 +80,7 @@ public final class MainActivity extends Activity {
         int oldFirst=keepScroll?layout.findFirstVisibleItemPosition():-1; int offset=0;ArrayList<Long> oldIds=new ArrayList<>();
         if(oldFirst>=0){View anchor=layout.findViewByPosition(oldFirst);if(anchor!=null)offset=anchor.getTop()-list.getPaddingTop();for(Entry e:adapter.data)oldIds.add(e.id);}
         Trip trip=tripId>=0?repository.getTrip(tripId):null;if(tripId>=0&&trip==null)tripId=-1;
+        tripBack.setEnabled(tripId>=0);
         getPreferences(0).edit().putLong("trip",tripId).apply();
         title.setText(t("Собрано","Packed")); back.setVisibility(tripId>=0?View.VISIBLE:View.GONE);
         action.setText(tripId<0?t("＋ Новая поездка","＋ New trip"):t("＋ Добавить вещь","＋ Add item"));

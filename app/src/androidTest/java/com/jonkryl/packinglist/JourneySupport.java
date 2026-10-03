@@ -87,7 +87,7 @@ final class JourneySupport {
     }
 
     static void input(int id, String value) {
-        onView(withId(id)).perform(scrollTo(), replaceText(value), closeSoftKeyboard());
+        onView(withId(id)).perform(scrollTo(), replaceText(value), androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
     }
 
     static void save() {

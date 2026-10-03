@@ -70,6 +70,7 @@ tasks.configureEach {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation("androidx.activity:activity:1.11.0")
     implementation("androidx.core:core:1.17.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("com.yandex.android:mobileads:8.5.0")

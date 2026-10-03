@@ -4,6 +4,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.Until;
 import com.jonkryl.packinglist.domain.PackingModels.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -114,6 +115,21 @@ public final class PackingJourneyTest {
             screenshot("05-ru-trip");
             onView(withId(R.id.add_button)).check(matches(withText("＋ Добавить вещь")));
             locale("en"); scenario.recreate();
+
+            // Inject real system Back: the trip callback returns home; another Back leaves the app.
+            androidx.test.espresso.Espresso.pressBack();
+            scenario.onActivity(activity -> assertEquals(-1L, activity.currentTripIdForTests()));
+            onView(withId(R.id.add_button)).check(matches(withText("＋ New trip")));
+            androidx.test.espresso.Espresso.pressBackUnconditionally();
+            assertTrue("Back from the trip list must leave the app foreground",
+                    device().wait(Until.gone(By.res(PACKAGE, "add_button")), 5000));
+        }
+        // Restore the original trip through the UI for the separate process-restart invocation.
+        try (ActivityScenario<MainActivity> restored = ActivityScenario.launch(MainActivity.class)) {
+            openOriginalFromHome();
+            assertEquals(TITLE, trip(restored).title);
+            assertEquals(1, trip(restored).packedCount());
+            assertEquals(3, trip(restored).items.get(0).quantity);
         }
     }
 
