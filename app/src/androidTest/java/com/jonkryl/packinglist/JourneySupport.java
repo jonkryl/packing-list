@@ -1,12 +1,10 @@
 package com.jonkryl.packinglist;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.os.LocaleList;
 import android.view.View;
 import androidx.test.espresso.Root;
 import androidx.test.espresso.ViewInteraction;
@@ -15,7 +13,6 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.*;
 import com.jonkryl.packinglist.domain.PackingModels.Trip;
 import java.io.File;
-import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
@@ -25,6 +22,7 @@ import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.anyOf;
 import static org.junit.Assert.*;
 
 final class JourneySupport {
@@ -68,16 +66,25 @@ final class JourneySupport {
         android.util.Log.i("SobranoJourney", "OFFLINE verified: no network with INTERNET capability");
     }
 
-    @SuppressWarnings("deprecation")
     static void locale(String language) {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
-            Locale value = new Locale(language);
-            Locale.setDefault(value);
-            Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-            Configuration config = new Configuration(context.getResources().getConfiguration());
-            config.setLocales(new LocaleList(value));
-            context.getResources().updateConfiguration(config, context.getResources().getDisplayMetrics());
-        });
+        // Fixture setup only, before launch. Post-launch changes use the real language menu below.
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        assertTrue(context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                .edit().putString("language", language).commit());
+    }
+
+    static void chooseLanguage(String language) {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        android.content.SharedPreferences preferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE);
+        String current = preferences.getString("language", "system");
+        focusedView(anyOf(withContentDescription("Menu"), withContentDescription("Меню"))).perform(click());
+        clickText("ru".equals(current) ? "Язык" : "Language");
+        clickText("ru".equals(language) ? "Русский" : "English");
+        String expected = "ru".equals(language) ? "＋ Добавить вещь" : "＋ Add item";
+        assertNotNull("Language menu must recreate the actual app with translated controls",
+                device().wait(Until.findObject(By.res(PACKAGE, "add_button").text(expected)), 5000));
+        assertEquals("Language choice is saved by the real menu", language, preferences.getString("language", "system"));
+        view(R.id.add_button).check(androidx.test.espresso.assertion.ViewAssertions.matches(withText(expected)));
     }
 
     static void acceptContextualIfNeeded() throws Exception {
@@ -146,9 +153,26 @@ final class JourneySupport {
     }
 
     static void spinner(int id, String value) {
-        view(id).perform(scrollTo(), click());
-        assertNotNull("Spinner popup must expose the requested choice",
-                device().wait(Until.findObject(By.text(value)), 5000));
+        AtomicReference<Rect> visible = new AtomicReference<>();
+        view(id).perform(scrollTo()).check((target, error) -> {
+            if (error != null) throw error;
+            android.widget.Spinner spinner = (android.widget.Spinner) target;
+            android.widget.SpinnerAdapter adapter = spinner.getAdapter();
+            assertNotNull("Spinner must have its actual product adapter", adapter);
+            boolean found = false;
+            for (int i = 0; i < adapter.getCount(); i++) found |= value.equals(String.valueOf(adapter.getItem(i)));
+            android.util.Log.i("SobranoJourney", "Open spinner " + target.getResources().getResourceEntryName(id)
+                    + " requested=" + value + " adapterCount=" + adapter.getCount() + " selected=" + spinner.getSelectedItem());
+            assertTrue("Requested owner must exist in the actual spinner adapter: " + value, found);
+            Rect bounds = new Rect();
+            assertTrue("Spinner must expose a real visible touch area", target.getGlobalVisibleRect(bounds));
+            visible.set(bounds);
+        });
+        Rect bounds = visible.get();
+        // API 24 CI logged Espresso turning an overslept tap into a long press. UiDevice uses a fast tap.
+        assertTrue("Native spinner opener must inject a real tap", device().click(bounds.centerX(), bounds.centerY()));
+        onView(isRoot()).inRoot(isPlatformPopup()).check(androidx.test.espresso.assertion.ViewAssertions.matches(isDisplayed()));
+        // Adapter selection can scroll; a visible-text precondition would reject valid off-screen rows.
         onData(equalTo(value)).inRoot(isPlatformPopup()).perform(click());
         view(id).check(androidx.test.espresso.assertion.ViewAssertions.matches(withSpinnerText(value)));
     }

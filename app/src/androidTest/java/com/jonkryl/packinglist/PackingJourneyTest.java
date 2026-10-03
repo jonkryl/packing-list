@@ -114,14 +114,14 @@ public final class PackingJourneyTest {
             assertEquals(1, trip(scenario).packedCount());
             assertEquals(3, trip(scenario).items.get(0).quantity);
 
-            locale("ru"); scenario.recreate();
+            chooseLanguage("ru");
             screenshot("05-ru-trip");
             view(R.id.add_button).check(matches(withText("＋ Добавить вещь")));
             clickMainId("remaining_filter");
             view(R.id.remaining_filter).check(matches(withText("Осталось собрать"))).check(matches(isChecked()));
             screenshot("06-ru-remaining");
             clickMainId("remaining_filter");
-            locale("en"); scenario.recreate();
+            chooseLanguage("en");
 
             // Inject real system Back: the trip callback returns home; another Back leaves the app.
             androidx.test.espresso.Espresso.pressBack();

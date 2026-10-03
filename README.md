@@ -4,6 +4,8 @@ Local packing lists for trips, people and bags. Original Android application by 
 
 Trips, item quantities, people, bags and packing marks stay on the device. Templates become fully editable trips. Repeated item names are allowed. Export uses Android's text share sheet. The app uses a Yandex Advertising Network banner; personalization preferences never disable advertising entirely.
 
+The app menu lets users choose Russian, English or the system language. The active trip and pending undo survive Activity recreation. Undo stays in memory and is cleared when the app process ends.
+
 ## Build and verification
 
 The project uses Java 17, Android Gradle Plugin 8.13.2, Gradle 8.13 and Android SDK 36. The checked-in wrapper verifies the Gradle distribution SHA-256. Gradle is limited to two workers and a 2 GB JVM.

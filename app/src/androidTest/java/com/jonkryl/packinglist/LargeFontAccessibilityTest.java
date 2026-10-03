@@ -41,7 +41,7 @@ public final class LargeFontAccessibilityTest {
             screenshot("08-en-font-200-form");
             view(android.R.id.button2).perform(click());
             assertEquals(3, trip(scenario).items.size());
-            locale("ru"); scenario.recreate();
+            chooseLanguage("ru");
             screenshot("09-ru-font-200-trip");
             view(R.id.add_button).check(matches(withText("＋ Добавить вещь")));
         }

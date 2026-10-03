@@ -2,6 +2,7 @@ package com.jonkryl.packinglist;
 
 import android.app.AlertDialog;
 import android.content.*;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -38,6 +39,16 @@ public final class MainActivity extends ComponentActivity {
     private PackingRepository.UndoToken undo;
     private boolean english;
     private OnBackPressedCallback tripBack;
+
+    @Override protected void attachBaseContext(Context base) {
+        String language=base.getSharedPreferences("app_settings",Context.MODE_PRIVATE).getString("language","system");
+        if("ru".equals(language)||"en".equals(language)){
+            Configuration configuration=new Configuration(base.getResources().getConfiguration());
+            configuration.setLocales(new LocaleList(Locale.forLanguageTag(language)));
+            base=base.createConfigurationContext(configuration);
+        }
+        super.attachBaseContext(base);
+    }
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -100,7 +111,17 @@ public final class MainActivity extends ComponentActivity {
     private int rowIndex(long id){for(int i=0;i<adapter.data.size();i++)if(adapter.data.get(i).id==id)return i;return -1;}
     private void safe(Runnable operation){try{operation.run();}catch(RuntimeException e){refresh(true);new AlertDialog.Builder(this).setTitle(t("Изменение не сохранено","Change was not saved")).setMessage(e instanceof IllegalArgumentException?e.getMessage():t("Не удалось сохранить данные. Освободите место и повторите. Предыдущие данные сохранены.","Could not save. Free some storage and try again. Previous data is preserved.")).setPositiveButton("OK",null).show();}}
     private void offerUndo(PackingRepository.UndoToken token){undo=token;packingState.undo=token;undoBar.removeAllViews();TextView label=text(t("Изменение сохранено","Change saved"),14,false);undoBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));Button b=button(t("Отменить","Undo"),v->safe(()->{if(repository.undo(undo)){undo=null;packingState.undo=null;undoBar.setVisibility(View.GONE);refresh(true);}}));b.setId(R.id.undo_button);undoBar.addView(b);undoBar.setVisibility(View.VISIBLE);}
-    private void appMenu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Приватность рекламы","Ad privacy")).setOnMenuItemClickListener(m->{banner.showPrivacyChoice();return true;});p.getMenu().add(t("Политика конфиденциальности","Privacy policy")).setOnMenuItemClickListener(m->{banner.openPrivacyPolicy();return true;});p.show();}
+    private void appMenu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Язык","Language")).setOnMenuItemClickListener(m->{languageChoice();return true;});p.getMenu().add(t("Приватность рекламы","Ad privacy")).setOnMenuItemClickListener(m->{banner.showPrivacyChoice();return true;});p.getMenu().add(t("Политика конфиденциальности","Privacy policy")).setOnMenuItemClickListener(m->{banner.openPrivacyPolicy();return true;});p.show();}
+    private void languageChoice(){
+        SharedPreferences preferences=getSharedPreferences("app_settings",Context.MODE_PRIVATE);
+        String language=preferences.getString("language","system");
+        String[] values={"system","ru","en"};int selected="ru".equals(language)?1:"en".equals(language)?2:0;
+        new AlertDialog.Builder(this).setTitle(t("Язык","Language"))
+                .setSingleChoiceItems(new String[]{t("Как в системе","System default"),"Русский","English"},selected,(dialog,index)->{
+                    preferences.edit().putString("language",values[index]).apply();
+                    dialog.dismiss();recreate();
+                }).setNegativeButton(t("Отмена","Cancel"),null).show();
+    }
     private void tripMenu(Trip trip,View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Изменить поездку","Edit trip")).setOnMenuItemClickListener(m->{tripEditor(trip);return true;});p.getMenu().add(t("Участники и сумки","People and bags")).setOnMenuItemClickListener(m->{manageOwners(trip);return true;});p.getMenu().add(t("Копировать поездку","Copy trip")).setOnMenuItemClickListener(m->{copyDialog(trip);return true;});p.getMenu().add(t("Поделиться списком","Share list")).setOnMenuItemClickListener(m->{shareTrip(trip);return true;});p.getMenu().add(t("Удалить поездку","Delete trip")).setOnMenuItemClickListener(m->{new AlertDialog.Builder(this).setTitle(t("Удалить поездку?","Delete trip?")).setMessage(trip.title).setNegativeButton(t("Оставить","Keep"),null).setPositiveButton(t("Удалить","Delete"),(d,w)->safe(()->{offerUndo(repository.deleteTrip(trip.id));refresh(true);})).show();return true;});p.show();}
     public void shareTrip(Trip trip){Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_SUBJECT,trip.title);send.putExtra(Intent.EXTRA_TEXT,repository.exportTrip(trip.id,english));startActivity(Intent.createChooser(send,t("Поделиться списком","Share packing list")));}
     private EditText field(LinearLayout box,String label,String value,int id,int type){TextView l=text(label,14,true);box.addView(l);EditText e=new EditText(this);e.setId(id);e.setText(value);e.setTextSize(18);e.setInputType(type);e.setMinHeight(dp(48));e.setTextColor(INK);box.addView(e,new LinearLayout.LayoutParams(-1,-2));return e;}
