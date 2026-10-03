@@ -54,6 +54,30 @@ final class JourneySupport {
         return onView(matcher).inRoot(focusedRoot(null));
     }
 
+    private static boolean containsAdapterView(View view) {
+        if (view instanceof android.widget.AdapterView) return true;
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (containsAdapterView(group.getChildAt(i))) return true;
+            }
+        }
+        return false;
+    }
+
+    private static Matcher<Root> spinnerPopupRoot() {
+        return new TypeSafeMatcher<Root>() {
+            @Override public void describeTo(Description description) {
+                description.appendText("focused native spinner popup containing an AdapterView");
+            }
+            @Override protected boolean matchesSafely(Root root) {
+                View decor = root.getDecorView();
+                return isPlatformPopup().matches(root) && decor.hasWindowFocus()
+                        && !decor.isLayoutRequested() && containsAdapterView(decor);
+            }
+        };
+    }
+
     static void assertOffline() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         ConnectivityManager manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -153,7 +177,6 @@ final class JourneySupport {
     }
 
     static void spinner(int id, String value) {
-        AtomicReference<Rect> visible = new AtomicReference<>();
         view(id).perform(scrollTo()).check((target, error) -> {
             if (error != null) throw error;
             android.widget.Spinner spinner = (android.widget.Spinner) target;
@@ -166,14 +189,19 @@ final class JourneySupport {
             assertTrue("Requested owner must exist in the actual spinner adapter: " + value, found);
             Rect bounds = new Rect();
             assertTrue("Spinner must expose a real visible touch area", target.getGlobalVisibleRect(bounds));
-            visible.set(bounds);
         });
-        Rect bounds = visible.get();
+        String resourceName = InstrumentationRegistry.getInstrumentation().getTargetContext()
+                .getResources().getResourceEntryName(id);
+        UiObject2 widget = device().wait(Until.findObject(By.res(PACKAGE, resourceName)), 5000);
+        assertInsideScreen(widget);
+        // Accessibility bounds are in screen space; View global bounds are local to a dialog's root.
+        Rect bounds = widget.getVisibleBounds();
+        android.util.Log.i("SobranoJourney", "Spinner screen tap " + resourceName + " bounds=" + bounds.toShortString());
         // API 24 CI logged Espresso turning an overslept tap into a long press. UiDevice uses a fast tap.
         assertTrue("Native spinner opener must inject a real tap", device().click(bounds.centerX(), bounds.centerY()));
-        onView(isRoot()).inRoot(isPlatformPopup()).check(androidx.test.espresso.assertion.ViewAssertions.matches(isDisplayed()));
+        onView(isRoot()).inRoot(spinnerPopupRoot()).check(androidx.test.espresso.assertion.ViewAssertions.matches(isDisplayed()));
         // Adapter selection can scroll; a visible-text precondition would reject valid off-screen rows.
-        onData(equalTo(value)).inRoot(isPlatformPopup()).perform(click());
+        onData(equalTo(value)).inRoot(spinnerPopupRoot()).perform(click());
         view(id).check(androidx.test.espresso.assertion.ViewAssertions.matches(withSpinnerText(value)));
     }
 
