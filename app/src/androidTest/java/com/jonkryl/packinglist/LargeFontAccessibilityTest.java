@@ -28,22 +28,22 @@ public final class LargeFontAccessibilityTest {
             });
             assertEquals(TITLE, trip(scenario).title);
             clickMainId("remaining_filter");
-            onView(withId(R.id.remaining_filter)).check(matches(isChecked()));
+            view(R.id.remaining_filter).check(matches(isChecked()));
             screenshot("07-en-font-200-remaining");
             clickMainId("remaining_filter");
 
-            onView(withId(R.id.add_button)).perform(click());
+            view(R.id.add_button).perform(click());
             input(R.id.item_name, "Large font check");
             input(R.id.item_quantity, "2");
-            onView(withId(R.id.bag_spinner)).perform(scrollTo());
+            view(R.id.bag_spinner).perform(scrollTo());
             UiObject2 bag = device().findObject(By.res(PACKAGE, "bag_spinner"));
             assertInsideScreen(bag);
             screenshot("08-en-font-200-form");
-            onView(withId(android.R.id.button2)).perform(click());
+            view(android.R.id.button2).perform(click());
             assertEquals(3, trip(scenario).items.size());
             locale("ru"); scenario.recreate();
             screenshot("09-ru-font-200-trip");
-            onView(withId(R.id.add_button)).check(matches(withText("＋ Добавить вещь")));
+            view(R.id.add_button).check(matches(withText("＋ Добавить вещь")));
         }
     }
 }

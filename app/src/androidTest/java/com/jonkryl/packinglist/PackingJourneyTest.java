@@ -26,7 +26,7 @@ public final class PackingJourneyTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             try {
             acceptContextualIfNeeded();
-            onView(withId(R.id.add_button)).perform(click());
+            view(R.id.add_button).perform(click());
             input(R.id.trip_name, TITLE);
             input(R.id.start_date, "2026-10-10");
             input(R.id.end_date, "2026-10-12");
@@ -48,7 +48,7 @@ public final class PackingJourneyTest {
             mainText("Bottle × 1");
             long[] idsBefore = adapterIds(scenario);
             long packedId = initial.items.get(0).id;
-            onView(withTagValue(is("packed_" + packedId))).perform(click());
+            focusedView(withTagValue(is("packed_" + packedId))).perform(click());
             assertTrue(trip(scenario).items.get(0).packed);
             assertArrayEquals("Packing marks must retain row IDs and order", idsBefore, adapterIds(scenario));
             screenshot("01-en-trip");
@@ -63,16 +63,18 @@ public final class PackingJourneyTest {
             mainText("Bottle × 1"); clickText("Bottle × 1");
             input(R.id.item_quantity, "3"); save();
             assertEquals(3, trip(scenario).items.get(0).quantity);
-            onView(withId(R.id.undo_button)).perform(click());
+            view(R.id.undo_button).perform(click());
             assertEquals(1, trip(scenario).items.get(0).quantity);
             mainText("Bottle × 1"); clickText("Bottle × 1");
             input(R.id.item_quantity, "3"); save();
 
             mainText("Passport × 1");
-            onView(withContentDescription("Item actions Passport")).perform(click());
+            focusedView(withContentDescription("Item actions Passport")).perform(click());
             clickText("Delete item");
             assertEquals(2, trip(scenario).items.size());
-            onView(withId(R.id.undo_button)).perform(click());
+            scenario.recreate();
+            assertEquals("Deleted item stays deleted until undo after Activity recreation", 2, trip(scenario).items.size());
+            view(R.id.undo_button).check(matches(isDisplayed())).perform(click());
             assertEquals(3, trip(scenario).items.size());
             assertEquals(initial.items.get(2).id, trip(scenario).items.get(2).id);
 
@@ -92,7 +94,7 @@ public final class PackingJourneyTest {
             Trip original = trip(scenario);
             tripMenu(TITLE); clickText("Copy trip");
             input(R.id.copy_name, TITLE + " reset");
-            onView(withId(R.id.reset_marks)).check(matches(isChecked()));
+            view(R.id.reset_marks).check(matches(isChecked()));
             save();
             Trip resetCopy = trip(scenario);
             assertEquals(0, resetCopy.packedCount());
@@ -104,7 +106,7 @@ public final class PackingJourneyTest {
             openOriginalFromHome();
             tripMenu(TITLE); clickText("Copy trip");
             input(R.id.copy_name, TITLE + " kept");
-            onView(withId(R.id.reset_marks)).perform(scrollTo(), click());
+            view(R.id.reset_marks).perform(scrollTo(), click());
             save();
             assertEquals(1, trip(scenario).packedCount());
             openOriginalFromHome();
@@ -114,13 +116,17 @@ public final class PackingJourneyTest {
 
             locale("ru"); scenario.recreate();
             screenshot("05-ru-trip");
-            onView(withId(R.id.add_button)).check(matches(withText("＋ Добавить вещь")));
+            view(R.id.add_button).check(matches(withText("＋ Добавить вещь")));
+            clickMainId("remaining_filter");
+            view(R.id.remaining_filter).check(matches(withText("Осталось собрать"))).check(matches(isChecked()));
+            screenshot("06-ru-remaining");
+            clickMainId("remaining_filter");
             locale("en"); scenario.recreate();
 
             // Inject real system Back: the trip callback returns home; another Back leaves the app.
             androidx.test.espresso.Espresso.pressBack();
             scenario.onActivity(activity -> assertEquals(-1L, activity.currentTripIdForTests()));
-            onView(withId(R.id.add_button)).check(matches(withText("＋ New trip")));
+            view(R.id.add_button).check(matches(withText("＋ New trip")));
             androidx.test.espresso.Espresso.pressBackUnconditionally();
             assertTrue("Back from the trip list must leave the app foreground",
                     device().wait(Until.gone(By.res(PACKAGE, "add_button")), 5000));
@@ -158,7 +164,7 @@ public final class PackingJourneyTest {
         Trip deleted = trip(scenario);
         assertEquals(before.items.size(), deleted.items.size());
         assertEquals(1, person ? deleted.people.size() : deleted.bags.size());
-        onView(withId(R.id.undo_button)).perform(click());
+        view(R.id.undo_button).perform(click());
         Trip restored = trip(scenario);
         assertEquals(2, person ? restored.people.size() : restored.bags.size());
         assertEquals(before.items.get(1).personId, restored.items.get(1).personId);
@@ -166,7 +172,7 @@ public final class PackingJourneyTest {
     }
 
     private void addItem(String name, String quantity, String person, String bag) {
-        onView(withId(R.id.add_button)).perform(click());
+        view(R.id.add_button).perform(click());
         input(R.id.item_name, name); input(R.id.item_quantity, quantity);
         spinner(R.id.person_spinner, person); spinner(R.id.bag_spinner, bag); save();
     }

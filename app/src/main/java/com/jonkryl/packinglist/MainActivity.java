@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.*;
 import com.jonkryl.packinglist.ads.BannerController;
 import com.jonkryl.packinglist.domain.*;
@@ -24,7 +25,7 @@ import java.util.*;
 public final class MainActivity extends ComponentActivity {
     private static final int INK=0xff193a38, TEAL=0xff176b5a, MUTED=0xff526b67, PAPER=0xfff4f6f1;
     private PackingRepository repository;
-    private SQLitePersistence persistence;
+    private PackingState packingState;
     private long tripId=-1;
     private boolean remaining=false;
     private Grouping grouping=Grouping.NONE;
@@ -41,7 +42,8 @@ public final class MainActivity extends ComponentActivity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("ru");
-        persistence=new SQLitePersistence(this);repository=new PackingRepository(persistence);
+        packingState=new ViewModelProvider(this,new PackingState.Factory(getApplication())).get(PackingState.class);
+        repository=packingState.repository;
         if(state!=null){ tripId=state.getLong("trip",-1); remaining=state.getBoolean("remaining"); grouping=Grouping.valueOf(state.getString("group","NONE")); }
         else tripId=getPreferences(0).getLong("trip",-1);
         tripBack=new OnBackPressedCallback(tripId>=0){
@@ -61,10 +63,11 @@ public final class MainActivity extends ComponentActivity {
         LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.setMargins(dp(16),dp(8),dp(16),dp(12));root.addView(action,ap);
         FrameLayout ad=new FrameLayout(this);ad.setId(R.id.ad_container);root.addView(ad,new LinearLayout.LayoutParams(-1,-2));
         setContentView(root);banner=new BannerController(this);banner.attach(ad);refresh(false);
+        if(packingState.undo!=null)offerUndo(packingState.undo);
     }
     @Override protected void onStart(){super.onStart();if(banner!=null)banner.onStart();}
     @Override protected void onStop(){if(banner!=null)banner.onStop();super.onStop();}
-    @Override protected void onDestroy(){if(banner!=null)banner.destroy();if(persistence!=null)persistence.close();super.onDestroy();}
+    @Override protected void onDestroy(){if(banner!=null)banner.destroy();super.onDestroy();}
     @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putLong("trip",tripId);b.putBoolean("remaining",remaining);b.putString("group",grouping.name());}
     private String t(String ru,String en){return english?en:ru;}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -96,7 +99,7 @@ public final class MainActivity extends ComponentActivity {
     }
     private int rowIndex(long id){for(int i=0;i<adapter.data.size();i++)if(adapter.data.get(i).id==id)return i;return -1;}
     private void safe(Runnable operation){try{operation.run();}catch(RuntimeException e){refresh(true);new AlertDialog.Builder(this).setTitle(t("Изменение не сохранено","Change was not saved")).setMessage(e instanceof IllegalArgumentException?e.getMessage():t("Не удалось сохранить данные. Освободите место и повторите. Предыдущие данные сохранены.","Could not save. Free some storage and try again. Previous data is preserved.")).setPositiveButton("OK",null).show();}}
-    private void offerUndo(PackingRepository.UndoToken token){undo=token;undoBar.removeAllViews();TextView label=text(t("Изменение сохранено","Change saved"),14,false);undoBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));Button b=button(t("Отменить","Undo"),v->safe(()->{if(repository.undo(undo)){undo=null;undoBar.setVisibility(View.GONE);refresh(true);}}));b.setId(R.id.undo_button);undoBar.addView(b);undoBar.setVisibility(View.VISIBLE);}
+    private void offerUndo(PackingRepository.UndoToken token){undo=token;packingState.undo=token;undoBar.removeAllViews();TextView label=text(t("Изменение сохранено","Change saved"),14,false);undoBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));Button b=button(t("Отменить","Undo"),v->safe(()->{if(repository.undo(undo)){undo=null;packingState.undo=null;undoBar.setVisibility(View.GONE);refresh(true);}}));b.setId(R.id.undo_button);undoBar.addView(b);undoBar.setVisibility(View.VISIBLE);}
     private void appMenu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Приватность рекламы","Ad privacy")).setOnMenuItemClickListener(m->{banner.showPrivacyChoice();return true;});p.getMenu().add(t("Политика конфиденциальности","Privacy policy")).setOnMenuItemClickListener(m->{banner.openPrivacyPolicy();return true;});p.show();}
     private void tripMenu(Trip trip,View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Изменить поездку","Edit trip")).setOnMenuItemClickListener(m->{tripEditor(trip);return true;});p.getMenu().add(t("Участники и сумки","People and bags")).setOnMenuItemClickListener(m->{manageOwners(trip);return true;});p.getMenu().add(t("Копировать поездку","Copy trip")).setOnMenuItemClickListener(m->{copyDialog(trip);return true;});p.getMenu().add(t("Поделиться списком","Share list")).setOnMenuItemClickListener(m->{shareTrip(trip);return true;});p.getMenu().add(t("Удалить поездку","Delete trip")).setOnMenuItemClickListener(m->{new AlertDialog.Builder(this).setTitle(t("Удалить поездку?","Delete trip?")).setMessage(trip.title).setNegativeButton(t("Оставить","Keep"),null).setPositiveButton(t("Удалить","Delete"),(d,w)->safe(()->{offerUndo(repository.deleteTrip(trip.id));refresh(true);})).show();return true;});p.show();}
     public void shareTrip(Trip trip){Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_SUBJECT,trip.title);send.putExtra(Intent.EXTRA_TEXT,repository.exportTrip(trip.id,english));startActivity(Intent.createChooser(send,t("Поделиться списком","Share packing list")));}
@@ -119,7 +122,8 @@ public final class MainActivity extends ComponentActivity {
     }
     private Spinner select(LinearLayout b,String label,List<String> options,int id){b.addView(text(label,14,true));Spinner s=new Spinner(this);s.setId(id);s.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options));b.addView(s,new LinearLayout.LayoutParams(-1,dp(56)));return s;}
     private void itemMenu(Item item,View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Изменить вещь","Edit item")).setOnMenuItemClickListener(m->{itemEditor(item);return true;});p.getMenu().add(t("Удалить вещь","Delete item")).setOnMenuItemClickListener(m->{safe(()->{offerUndo(repository.deleteItem(tripId,item.id));refresh(true);});return true;});p.show();}
-    private void copyDialog(Trip trip){LinearLayout b=form();EditText name=field(b,t("Название копии","Copy name"),trip.title+t(" — копия"," — copy"),R.id.copy_name,InputType.TYPE_CLASS_TEXT);CheckBox reset=new CheckBox(this);reset.setText(t("Сбросить отметки сборки","Reset packed marks"));reset.setTextSize(16);reset.setChecked(true);reset.setMinHeight(dp(48));reset.setId(R.id.reset_marks);b.addView(reset);b.addView(text(t("Люди, сумки и количество сохранятся.","People, bags and quantities will be copied."),14,false));AlertDialog d=dialog(t("Копировать поездку","Copy trip"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{if(name.getText().toString().trim().isEmpty()){name.setError(t("Введите название","Enter a name"));return;}long copy=repository.copyTrip(trip.id,name.getText().toString(),reset.isChecked());d.dismiss();openTrip(copy);})));d.show();}
+    private String copyName(String original){String suffix=t(" — копия"," — copy");int limit=Math.min(original.length(),120-suffix.length());if(limit>0&&limit<original.length()&&Character.isHighSurrogate(original.charAt(limit-1))&&Character.isLowSurrogate(original.charAt(limit)))limit--;return original.substring(0,limit)+suffix;}
+    private void copyDialog(Trip trip){LinearLayout b=form();EditText name=field(b,t("Название копии","Copy name"),copyName(trip.title),R.id.copy_name,InputType.TYPE_CLASS_TEXT);CheckBox reset=new CheckBox(this);reset.setText(t("Сбросить отметки сборки","Reset packed marks"));reset.setTextSize(16);reset.setChecked(true);reset.setMinHeight(dp(48));reset.setId(R.id.reset_marks);b.addView(reset);b.addView(text(t("Люди, сумки и количество сохранятся.","People, bags and quantities will be copied."),14,false));AlertDialog d=dialog(t("Копировать поездку","Copy trip"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{if(name.getText().toString().trim().isEmpty()){name.setError(t("Введите название","Enter a name"));return;}long copy=repository.copyTrip(trip.id,name.getText().toString(),reset.isChecked());d.dismiss();openTrip(copy);})));d.show();}
     private void manageOwners(Trip trip){Trip fresh=repository.getTrip(trip.id);if(fresh==null)return;ArrayList<String> options=new ArrayList<>();options.add(t("＋ Добавить участника","＋ Add person"));options.add(t("＋ Добавить сумку","＋ Add bag"));for(Person p:fresh.people)options.add(t("Участник: ","Person: ")+p.name);for(Bag b:fresh.bags)options.add(t("Сумка: ","Bag: ")+b.name);new AlertDialog.Builder(this).setTitle(t("Участники и сумки","People and bags")).setItems(options.toArray(new String[0]),(d,i)->{if(i<2)ownerEditor(fresh,i==0,null,"");else if(i<2+fresh.people.size()){Person p=fresh.people.get(i-2);ownerActions(fresh,true,p.id,p.name);}else{Bag b=fresh.bags.get(i-2-fresh.people.size());ownerActions(fresh,false,b.id,b.name);}}).setNegativeButton(t("Готово","Done"),null).show();}
     private void ownerActions(Trip trip,boolean person,long id,String name){new AlertDialog.Builder(this).setTitle(name).setItems(new String[]{t("Переименовать","Rename"),t("Удалить (вещи останутся)","Delete (keep items)")},(d,i)->{if(i==0)ownerEditor(trip,person,id,name);else safe(()->{offerUndo(person?repository.deletePerson(trip.id,id):repository.deleteBag(trip.id,id));refresh(true);});}).show();}
     private void ownerEditor(Trip trip,boolean person,Long id,String old){LinearLayout b=form();EditText n=field(b,t("Название","Name"),old,R.id.owner_name,InputType.TYPE_CLASS_TEXT);AlertDialog d=dialog(person?t("Участник","Person"):t("Сумка","Bag"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String name=n.getText().toString().trim();if(name.isEmpty()){n.setError(t("Введите название","Enter a name"));return;}if(id==null){if(person)repository.addPerson(trip.id,name);else repository.addBag(trip.id,name);}else offerUndo(person?repository.updatePerson(trip.id,id,name):repository.updateBag(trip.id,id,name));d.dismiss();refresh(true);})));d.show();}
