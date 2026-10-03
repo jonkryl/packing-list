@@ -30,6 +30,12 @@ final class JourneySupport {
     static final String PACKAGE = "com.jonkryl.packinglist";
     static UiDevice device() { return UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()); }
 
+    private static UiScrollable scrollable(UiSelector selector) {
+        // Legacy UiObject constructors require the singleton to be initialized in each process.
+        device();
+        return new UiScrollable(selector);
+    }
+
     private static Matcher<Root> focusedRoot(Integer targetId) {
         return new TypeSafeMatcher<Root>() {
             @Override public void describeTo(Description description) {
@@ -123,7 +129,7 @@ final class JourneySupport {
             assertTrue("Hidden privacy choice requires an actual scroll container",
                     device().findObject(selector).waitForExists(3000));
             assertTrue("Contextual privacy choice must become visible",
-                    new UiScrollable(selector).setMaxSearchSwipes(4).scrollTextIntoView("Contextual ads"));
+                    scrollable(selector).setMaxSearchSwipes(4).scrollTextIntoView("Contextual ads"));
             contextual = device().wait(Until.findObject(By.text("Contextual ads").enabled(true)), 3000);
         }
         assertInsideScreen(contextual);
@@ -148,14 +154,14 @@ final class JourneySupport {
 
     static void mainText(String value) throws Exception {
         assertTrue("Packing list could not scroll to " + value,
-                new UiScrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
+                scrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
                         .setMaxSearchSwipes(20).scrollTextIntoView(value));
         device().waitForIdle();
     }
 
     static void mainId(String value) throws Exception {
         assertTrue("Packing control is absent: " + value,
-                new UiScrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
+                scrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
                         .setMaxSearchSwipes(20).scrollIntoView(new UiSelector().resourceId(PACKAGE + ":id/" + value)));
         device().waitForIdle();
     }
