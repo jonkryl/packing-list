@@ -1,0 +1,81 @@
+name: Import verified native source
+
+on:
+  push:
+    branches: [main]
+    paths: [source-bootstrap.tar.gz]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: source-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SOURCE_SHA: SOURCE_SHA_PLACEHOLDER
+      SOURCE_ARCHIVE: source-bootstrap.tar.gz
+      BOOTSTRAP_WORKFLOW: .github/workflows/bootstrap-source.yml
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Check the immutable archive hash and safely import files
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import os
+          import re
+          import tarfile
+          from pathlib import Path, PurePosixPath
+
+          archive = Path(os.environ['SOURCE_ARCHIVE'])
+          expected = os.environ['SOURCE_SHA']
+          if not re.fullmatch(r'[0-9a-f]{64}', expected):
+              raise SystemExit('A fixed SHA-256 must be supplied before this workflow is saved')
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != expected:
+              raise SystemExit('Source archive hash does not match the verified input')
+          root = Path.cwd().resolve()
+          with tarfile.open(archive, 'r:gz') as source:
+              members = source.getmembers()
+              if len(members) > 10000 or sum(member.size for member in members) > 200_000_000:
+                  raise SystemExit('Archive exceeds the expected source size')
+              for member in members:
+                  relative = PurePosixPath(member.name)
+                  if relative.is_absolute() or '..' in relative.parts or '.git' in relative.parts:
+                      raise SystemExit(f'Unsafe source path: {member.name}')
+                  if not (member.isdir() or member.isfile()):
+                      raise SystemExit(f'Links and special files are forbidden: {member.name}')
+                  destination = (root / Path(*relative.parts)).resolve()
+                  if destination != root and root not in destination.parents:
+                      raise SystemExit(f'Path escapes checkout: {member.name}')
+              source.extractall(root, members=[m for m in members if not m.name.startswith('.github/')], filter='data')
+          required = ['gradlew', 'gradle/wrapper/gradle-wrapper.jar', 'app/build.gradle.kts',
+                      '.github/workflows/android-ci.yml', '.github/workflows/release.yml']
+          if not all(Path(path).is_file() for path in required):
+              raise SystemExit('Archive does not contain the complete native project')
+          Path('gradlew').chmod(0o755)
+          for script in Path('scripts').glob('*.sh'):
+              script.chmod(0o755)
+          # The permanent CI/release files retain provenance; bootstrap is only a transport.
+          archive.unlink()
+          # Bootstrap workflow is kept unchanged: GITHUB_TOKEN cannot edit workflow files.
+          PY
+      - name: Commit the verified source to main
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add --all
+          git commit -m "Import verified Sobrano native Android source (${SOURCE_SHA})"
+          git push origin HEAD:main
+      - name: Record import provenance
+        run: |
+          printf 'Imported source SHA-256: `%s`\n\n' "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Commit: `%s`\n\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Dispatch Android CI manually after this import; token pushes do not start workflows.\n' >> "$GITHUB_STEP_SUMMARY"

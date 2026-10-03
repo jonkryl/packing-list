@@ -1,0 +1,15 @@
+.gradle/
+.idea/
+local.properties
+**/build/
+*.iml
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+ci-artifacts/
+ci-apks/
+release-output/
+*.hprof
+.DS_Store

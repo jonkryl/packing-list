@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "packageName": "com.jonkryl.packinglist",
+  "preparedOn": "2026-10-03",
+  "status": "final_prepared_choices_not_submitted",
+  "privacyPolicyUrl": "https://jonkryl.github.io/packing-list/privacy/",
+  "sourceConfiguration": {
+    "sdk": "com.yandex.android:mobileads:8.5.0",
+    "adNetworks": [
+      "Yandex Advertising Network"
+    ],
+    "formats": [
+      "Bottom adaptive sticky banner"
+    ],
+    "automaticSdkInitialization": false,
+    "defaultPersonalization": false,
+    "firstLaunchChoiceBeforeSdkInitialization": true,
+    "personalizationDeclineStillLoadsAds": true,
+    "locationTracking": false,
+    "sdkAppAdAnalyticsReporting": false,
+    "adIdPermission": "Removed by tools:node=remove; verify merged signed release manifest",
+    "locationPermissions": false,
+    "cloudSync": false,
+    "accounts": false,
+    "localPackingDataSentToSdk": false,
+    "localData": "Trip titles/dates, people, bags, items, quantities and packed flags remain in private app storage; undo tokens are held in memory during the current activity session.",
+    "export": "Explicit Android ACTION_SEND chooser; receiving app selected by user",
+    "deletion": "Delete local trip/item with undo; clearing Android app data deletes all records and privacy preferences",
+    "backup": "allowBackup=false in app manifest; no developer recovery",
+    "retrials": "A single controller banner, 45s watchdog and three sequential retries after 10/30/60s; recovery on foreground or restored network; slot reserved during failures"
+  },
+  "appAccess": {
+    "allFunctionalityAvailableWithoutSpecialAccess": true,
+    "loginRequired": false,
+    "reviewerCredentialsRequired": false,
+    "reviewerInstructions": "At first launch select Contextual ads; create a trip using a template or an empty list. No login is required. Lists work offline."
+  },
+  "adsDeclaration": {
+    "containsAds": true,
+    "answer": "Yes"
+  },
+  "advertisingIdDeclaration": {
+    "answer": "Yes",
+    "purposes": [
+      "Advertising or marketing"
+    ],
+    "rationale": "The exact SDK 8.5.0 binary includes an AdvertisingIdClient.getAdvertisingIdInfo/getId path and a direct advertising-ID service fallback. This is SDK API usage; AD_ID permission absence must not be treated as proof that the app never uses the API.",
+    "permissionPresentInSource": false,
+    "nonzeroAdvertisingIdNotClaimed": "For target API33+ current Google Play services require AD_ID and otherwise return a zero ID. This release targets API36 and removes that permission."
+  },
+  "dataSafety": {
+    "collectsOrSharesUserData": "Yes",
+    "encryptedInTransit": "Yes",
+    "accountCreation": "None",
+    "deletionRequestBadge": "No",
+    "independentSecurityReview": "No",
+    "deviceOrOtherIds": {
+      "collected": true,
+      "shared": true,
+      "purposes": [
+        "Advertising or marketing"
+      ],
+      "requiredOrOptional": "Required",
+      "ephemeral": false,
+      "rationale": "Declare residual advertising identifiers as collected/shared. Choosing contextual ads changes personalization consent, while technical ad requests remain. The app has no control that stops all advertising data collection for every user and region, so the entire Device or other IDs data type is Required. This does not assert a nonzero Android Advertising ID without AD_ID permission.",
+      "declarationMethod": "Conservative category coverage; AD_ID permission removal is distinct from all residual technical identifiers."
+    },
+    "preciseLocation": {
+      "collected": false,
+      "shared": false,
+      "rationale": "No location permission or app-provided targeting location; SDK tracking disabled."
+    },
+    "approximateLocation": {
+      "collected": true,
+      "shared": true,
+      "purposes": [
+        "Advertising or marketing"
+      ],
+      "requiredOrOptional": "Required",
+      "ephemeral": false,
+      "rationale": "Yandex documents determining a network-app user region by IP. Google classifies IP-inferred physical region as approximate location. Android tracking is disabled, but advertising requests still reach Yandex with a network IP in both choices.",
+      "declarationMethod": "Conservative coverage of IP-derived region for all supported advertising modes; no claim that each request necessarily produces a usable city-level location.",
+      "sources": [
+        "https://yandex.ru/support/direct/en/efficiency/geotargeting",
+        "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+        "https://yandex.com/legal/international_ads_privacy_policy/en/"
+      ]
+    },
+    "notCollectedOrSharedByPackingCode": [
+      "Names",
+      "Emails",
+      "Trip dates",
+      "Item names and quantities",
+      "Bag names",
+      "Packed flags",
+      "Calendar data",
+      "Contacts",
+      "Files or documents",
+      "Photos, videos or audio",
+      "Financial information",
+      "Health or fitness data",
+      "Search history",
+      "Installed app inventory"
+    ],
+    "sdkPublishedNoCollection": [
+      "App interactions",
+      "Crash logs",
+      "Diagnostics",
+      "Other app performance data"
+    ],
+    "manualShare": "Local-only processing is not off-device collection. Explicit user-initiated sharing is an expected transfer through the chosen Android share destination.",
+    "supportEmail": "External user-initiated email only; privacy policy describes support message handling.",
+    "remainingVerification": [
+      "Confirm final signed artifact merged permissions/dependency graph and save the same choices in the actual Play form; declaration choices are now concrete."
+    ],
+    "reasonDeletionBadgeNo": "Local deletion and links to Yandex data rights are provided; an app-wide verified SDK data deletion mechanism has not been implemented.",
+    "consoleChoices": {
+      "collectsOrSharesUserData": true,
+      "encryptedInTransit": true,
+      "accountCreation": "No account creation",
+      "dataDeletionRequestMechanism": false,
+      "independentSecurityReview": false,
+      "selectedDataTypes": [
+        "Approximate location",
+        "Device or other IDs"
+      ],
+      "handlingForEachSelectedType": {
+        "collected": true,
+        "shared": true,
+        "ephemeral": false,
+        "collectionRequired": true,
+        "collectionPurposes": [
+          "Advertising or marketing"
+        ],
+        "sharingPurposes": [
+          "Advertising or marketing"
+        ]
+      },
+      "allOtherDataTypes": "Not selected based on local-only packing data and disabled location/analytics settings plus SDK disclosure"
+    }
+  },
+  "contentRating": {
+    "category": "Other / utility application",
+    "contactEmail": "jonkryl@gmail.com",
+    "questionnaire": {
+      "violenceOrBlood": false,
+      "sexualContentOrNudity": false,
+      "horrorOrFear": false,
+      "profanityInDeveloperContent": false,
+      "drugsAlcoholTobacco": false,
+      "gamblingOrRealMoneyContests": false,
+      "inAppPurchases": false,
+      "onlineChatOrUserInteraction": false,
+      "hostedPublicUserGeneratedContent": false,
+      "locationSharing": false,
+      "unrestrictedWebSearchOrBrowser": false
+    },
+    "computedIarcRatings": null,
+    "submitted": false,
+    "adsMustMatchComputedRating": true,
+    "notes": "Local user-written item/person names and a system Share action do not create hosted public content or chat. The console computes the ratings after the actual questionnaire."
+  },
+  "targetAudience": {
+    "ageGroups": [
+      "18 and over"
+    ],
+    "designedForChildren": false,
+    "familiesProgram": false,
+    "rationale": "Trip planning utility for adults, including parents packing for children. The With children template is a parent planning aid; product and marketing are not child-directed."
+  },
+  "otherDeclarations": {
+    "news": false,
+    "health": false,
+    "financialFeatures": false,
+    "government": false,
+    "realMoneyGambling": false,
+    "inAppPurchases": false,
+    "containsAds": true
+  },
+  "consent": {
+    "mechanism": "Saved app choice passed using YandexAds.setUserConsent before init and at every launch",
+    "usesCertifiedIabTcfCmp": false,
+    "tcfStringsWritten": false,
+    "notes": "Use the SDK documented direct consent route. This implementation does not claim certified CMP/TCF status."
+  },
+  "sources": [
+    {
+      "title": "Yandex geotargeting for network apps",
+      "url": "https://yandex.ru/support/direct/en/efficiency/geotargeting",
+      "evidence": "Extended geotargeting table footnote describes current region for search, network app and network site users being derived from Yandex location settings or IP address."
+    },
+    {
+      "title": "Yandex Android SDK8 integration",
+      "url": "https://ads.yandex.com/helpcenter/en/dev/android/quick-start"
+    },
+    {
+      "title": "Yandex SDK data safety disclosure",
+      "url": "https://ads.yandex.com/helpcenter/en/dev/android/app-privacy-android"
+    },
+    {
+      "title": "Yandex GDPR direct consent flow",
+      "url": "https://ads.yandex.com/helpcenter/en/dev/android/gdpr"
+    },
+    {
+      "title": "Yandex optional TCF route",
+      "url": "https://ads.yandex.com/helpcenter/en/dev/android/tcf-2-0"
+    },
+    {
+      "title": "Yandex Ads privacy and rights",
+      "url": "https://yandex.com/legal/international_ads_privacy_policy/en/"
+    },
+    {
+      "title": "Google Play Data safety",
+      "url": "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en"
+    },
+    {
+      "title": "Google Advertising ID requirements",
+      "url": "https://support.google.com/googleplay/android-developer/answer/6048248?hl=en"
+    },
+    {
+      "title": "AdvertisingIdClient.Info API",
+      "url": "https://developers.google.com/android/reference/com/google/android/gms/ads/identifier/AdvertisingIdClient.Info"
+    },
+    {
+      "title": "Google target audience",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9867159?hl=en"
+    },
+    {
+      "title": "Google content ratings",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9859655?hl=en"
+    }
+  ],
+  "declarationBasis": "Actual app source, exact SDK8.5.0 Advertising ID API evidence and cited primary provider/platform documentation. Conservatively includes residual advertising identifiers and IP-derived approximate region in both ad modes."
+}

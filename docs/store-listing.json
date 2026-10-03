@@ -1,0 +1,25 @@
+{
+  "packageName": "com.jonkryl.packinglist",
+  "category": "TRAVEL_AND_LOCAL",
+  "contactEmail": "jonkryl@gmail.com",
+  "privacyPolicyUrl": "https://jonkryl.github.io/packing-list/privacy/",
+  "status": "prepared_not_uploaded",
+  "localizations": {
+    "ru-RU": {
+      "title": "Собрано — вещи для поездки",
+      "shortDescription": "Списки вещей по людям и сумкам: поездки, количество и что осталось собрать.",
+      "fullDescription": "Соберите поездку без догадок, чья это вещь и в какой она сумке. «Собрано» хранит списки по людям и сумкам и показывает, что ещё осталось собрать.\n\nПОЕЗДКИ И ШАБЛОНЫ\nСоздавайте несколько поездок с названием и датами. Начните с авторских шаблонов «Выходные», «Рабочая поездка», «С детьми» или пустого списка. Каждый шаблон после создания можно полностью изменить.\n\nКОМУ ПРИНАДЛЕЖИТ И ГДЕ ЛЕЖИТ\nДобавляйте участников и сумки. У вещи есть название, количество, участник, сумка и отметка сборки. Одинаковые названия допустимы: у каждого может быть своя зарядка или футболка.\n\nОСТАЛОСЬ СОБРАТЬ\nОтмечайте вещи по мере сборки. Фильтр «Осталось» показывает несобранное, а группировка по человеку или сумке помогает проверить всё по порядку. В обычном списке отметки не меняют порядок вещей.\n\nИСПРАВЛЕНИЯ И НОВЫЕ ПОЕЗДКИ\nРедактируйте и удаляйте записи с возможностью отмены. Копируйте поездку и выбирайте, сохранить отметки сборки или сбросить их для следующего раза.\n\nЛОКАЛЬНОЕ СОХРАНЕНИЕ И ЭКСПОРТ\nЗакройте приложение и продолжите с сохранёнными поездками. Для списков не нужны аккаунт, сервер или интернет. Поделитесь текстом через системное меню Android: приложение и получателя выбираете вы. Облачной синхронизации нет; очистка данных приложения удаляет местные записи.\n\nИнтерфейс на русском и английском, крупные элементы управления и поддержка увеличенного системного шрифта. Android 7.0 и новее.\n\nПриложение содержит баннеры Яндекс РСЯ. Выбор персонализации находится в «Приватность рекламы»; реклама загружается в обоих режимах. Рекламный SDK может передавать технические сведения. Отсутствие сети или объявления не мешает спискам.\n\nПоддержка: jonkryl@gmail.com\nПолитика приватности: https://jonkryl.github.io/packing-list/privacy/"
+    },
+    "en-US": {
+      "title": "Packed: Travel packing lists",
+      "shortDescription": "Packing lists by people and bags. Plan trips and see what remains.",
+      "fullDescription": "Pack a trip knowing who each item belongs to and which bag it is in. Packed keeps lists by people and bags and shows what still needs packing.\n\nTRIPS AND TEMPLATES\nCreate multiple trips with names and dates. Start with original Weekend, Business trip, With kids templates or an empty list. Every created template can be fully edited.\n\nWHOSE ITEM, WHICH BAG\nAdd people and bags. Each item has a name, quantity, person, bag and packed mark. Identical names are welcome: everyone can have their own charger or shirt.\n\nWHAT REMAINS\nMark items as you pack. Remaining shows unpacked items, while grouping by person or bag helps you check everything in order. In the regular list, packed marks do not reorder items.\n\nEDIT, UNDO AND COPY\nEdit or delete records with undo. Copy a trip and choose whether to keep packed marks or reset them for next time.\n\nLOCAL SAVING AND EXPORT\nClose the app and continue with saved trips. Lists need no account, server or internet connection. Share trip text through Android’s system share sheet; you choose the app and recipient. There is no cloud sync; clearing app storage removes local records.\n\nRussian and English interface, large controls and support for enlarged system fonts. Android 7.0 or later.\n\nThe app contains Yandex Advertising Network banners. Ad privacy lets you change personalization; ads load in both modes. The advertising SDK may send technical information. An unavailable network or ad does not interrupt your lists.\n\nSupport: jonkryl@gmail.com\nPrivacy policy: https://jonkryl.github.io/packing-list/privacy/"
+    }
+  },
+  "releaseNotes": {
+    "ru-RU": "Первый выпуск: поездки, редактируемые шаблоны, участники и сумки, количество и отметки вещей, «Осталось», группировка, отмена, копирование и текстовый экспорт. Списки сохраняются на устройстве.",
+    "en-US": "First release: trips, editable templates, people and bags, item quantities and packed marks, Remaining filter, grouping, undo, trip copying and text export. Lists are saved on your device."
+  },
+  "assetRules": "Use original artwork and real screenshots from the app captured by successful CI device journeys. Do not claim production availability or paid ad serving until verified.",
+  "countries": "Select all available countries/regions, including Rest of world; verify the actual saved list in the chosen track."
+}

@@ -1,0 +1,14 @@
+{
+  "sdkVersion": "8.5.0",
+  "classesJarSHA256": "3ba11551f39dba9937db54f2bacc057a57ceea8a56868dc7264343536bb3df18",
+  "matchedClass": "yads.ud",
+  "classForName": "com.google.android.gms.ads.identifier.AdvertisingIdClient",
+  "methodNames": [
+    "getAdvertisingIdInfo",
+    "getId",
+    "isLimitAdTrackingEnabled"
+  ],
+  "fallback": "Context.bindService / advertising-ID service adapter in yads.ae2",
+  "verifiedBy": "Constant-pool inspection and javap -c -private of the exact cached SDK8.5.0 binary",
+  "doesNotProve": "Whether nonzero identifier is obtained/transmitted in this app configuration or every supported Play services version"
+}
