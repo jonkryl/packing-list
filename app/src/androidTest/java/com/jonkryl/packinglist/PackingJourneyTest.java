@@ -24,6 +24,7 @@ public final class PackingJourneyTest {
         locale("en");
         assertOffline();
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            try {
             acceptContextualIfNeeded();
             onView(withId(R.id.add_button)).perform(click());
             input(R.id.trip_name, TITLE);
@@ -123,6 +124,10 @@ public final class PackingJourneyTest {
             androidx.test.espresso.Espresso.pressBackUnconditionally();
             assertTrue("Back from the trip list must leave the app foreground",
                     device().wait(Until.gone(By.res(PACKAGE, "add_button")), 5000));
+            } catch (Exception | AssertionError failure) {
+                captureFailure("failure-journey-api" + android.os.Build.VERSION.SDK_INT);
+                throw failure;
+            }
         }
         // Restore the original trip through the UI for the separate process-restart invocation.
         try (ActivityScenario<MainActivity> restored = ActivityScenario.launch(MainActivity.class)) {

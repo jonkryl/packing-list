@@ -50,12 +50,27 @@ final class JourneySupport {
     }
 
     static void acceptContextualIfNeeded() throws Exception {
-        UiObject2 privacy = device().wait(Until.findObject(By.text("Ad privacy")), 2500);
-        if (privacy != null) {
-            new UiScrollable(new UiSelector().scrollable(true)).scrollTextIntoView("Contextual ads");
-            device().findObject(By.text("Contextual ads")).click();
-            device().waitForIdle();
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        android.content.SharedPreferences preferences = context.getSharedPreferences("ad_privacy", Context.MODE_PRIVATE);
+        if (preferences.getBoolean("choice_set", false)) return;
+        assertNotNull("First launch requires the ad privacy dialog",
+                device().wait(Until.findObject(By.text("Ad privacy")), 5000));
+        UiObject2 contextual = device().wait(Until.findObject(By.text("Contextual ads").enabled(true)), 2000);
+        if (contextual == null || contextual.getVisibleBounds().isEmpty()) {
+            UiSelector selector = new UiSelector().className("android.widget.ScrollView").scrollable(true);
+            assertTrue("Hidden privacy choice requires an actual scroll container",
+                    device().findObject(selector).waitForExists(3000));
+            assertTrue("Contextual privacy choice must become visible",
+                    new UiScrollable(selector).setMaxSearchSwipes(4).scrollTextIntoView("Contextual ads"));
+            contextual = device().wait(Until.findObject(By.text("Contextual ads").enabled(true)), 3000);
         }
+        assertInsideScreen(contextual);
+        contextual.click();
+        assertTrue("Privacy dialog must close after choosing contextual advertising",
+                device().wait(Until.gone(By.text("Ad privacy")), 5000));
+        assertTrue("The required privacy choice must be persisted", preferences.getBoolean("choice_set", false));
+        assertFalse("Contextual advertising must not grant personalization", preferences.getBoolean("personalized", true));
+        device().waitForIdle();
     }
 
     static UiObject2 text(String value) {
@@ -113,6 +128,17 @@ final class JourneySupport {
         File directory = new File(context.getExternalFilesDir(null), "screenshots");
         assertTrue(directory.isDirectory() || directory.mkdirs());
         assertTrue("Could not save actual app screenshot", device().takeScreenshot(new File(directory, name + ".png")));
+    }
+
+    static void captureFailure(String name) {
+        try {
+            screenshot(name);
+            Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+            File directory = new File(context.getExternalFilesDir(null), "screenshots");
+            device().dumpWindowHierarchy(new File(directory, name + ".xml"));
+        } catch (Exception | AssertionError captureError) {
+            android.util.Log.w("SobranoJourney", "Could not capture failure proof", captureError);
+        }
     }
 
     static void tripMenu(String title) throws Exception {

@@ -329,8 +329,10 @@ public final class PackingRepository {
         people.add(Math.min(token.index, people.size()), (Person) token.before);
         List<Item> items = new ArrayList<>();
         for (Item item : trip.items) {
-            Long personId = item.personId == null && token.reassignedItems.contains(item.id)
-                    ? token.entityId : item.personId;
+            Long personId = item.personId;
+            if (personId == null && token.reassignedItems.contains(item.id)) {
+                personId = token.entityId;
+            }
             items.add(new Item(item.id, item.name, item.quantity, personId, item.bagId, item.packed, item.order));
         }
         return copy(trip, people, trip.bags, items);
@@ -342,8 +344,10 @@ public final class PackingRepository {
         bags.add(Math.min(token.index, bags.size()), (Bag) token.before);
         List<Item> items = new ArrayList<>();
         for (Item item : trip.items) {
-            Long bagId = item.bagId == null && token.reassignedItems.contains(item.id)
-                    ? token.entityId : item.bagId;
+            Long bagId = item.bagId;
+            if (bagId == null && token.reassignedItems.contains(item.id)) {
+                bagId = token.entityId;
+            }
             items.add(new Item(item.id, item.name, item.quantity, item.personId, bagId, item.packed, item.order));
         }
         return copy(trip, trip.people, bags, items);

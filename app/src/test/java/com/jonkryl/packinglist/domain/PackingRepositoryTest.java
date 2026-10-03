@@ -158,6 +158,63 @@ public class PackingRepositoryTest {
         assertEquals(2, restored.quantity);
     }
 
+    @Test public void personUndeleteKeepsUnassignedItemsAndLaterEditsWithoutUnboxingNull() {
+        long alice = repository.addPerson(tripId, "Alice");
+        long bob = repository.addPerson(tripId, "Bob");
+        long affected = repository.addItem(tripId, "Hat", 1, alice, null);
+        long unassignedBefore = repository.addItem(tripId, "Passport", 1, null, null);
+        long reassignedLater = repository.addItem(tripId, "Socks", 2, alice, null);
+        PackingRepository.UndoToken undo = repository.deletePerson(tripId, alice);
+        long unassignedAfter = repository.addItem(tripId, "Water", 1, null, null);
+        repository.updateItem(tripId, affected, "Warm hat", 3, null, null);
+        repository.setPacked(tripId, affected, true);
+        repository.setPacked(tripId, unassignedBefore, true);
+        repository.updateItem(tripId, reassignedLater, "Socks", 4, bob, null);
+
+        assertTrue(repository.undo(undo));
+        // Inspect the persisted state too, rather than only the active repository snapshot.
+        Trip trip = new PackingRepository(storage).getTrip(tripId);
+        assertEquals(Arrays.asList(affected, unassignedBefore, reassignedLater, unassignedAfter), ids(trip.items));
+        assertEquals(Long.valueOf(alice), find(trip, affected).personId);
+        assertEquals("Warm hat", find(trip, affected).name);
+        assertEquals(3, find(trip, affected).quantity);
+        assertTrue(find(trip, affected).packed);
+        assertNull(find(trip, unassignedBefore).personId);
+        assertTrue(find(trip, unassignedBefore).packed);
+        assertNull(find(trip, unassignedAfter).personId);
+        assertEquals(Long.valueOf(bob), find(trip, reassignedLater).personId);
+        assertEquals(4, find(trip, reassignedLater).quantity);
+    }
+
+    @Test public void bagUndeleteKeepsBaglessItemsAndLaterAssignmentsWithoutUnboxingNull() {
+        long person = repository.addPerson(tripId, "Alice");
+        long main = repository.addBag(tripId, "Main bag");
+        long spare = repository.addBag(tripId, "Spare bag");
+        long affected = repository.addItem(tripId, "Cable", 1, person, main);
+        long baglessBefore = repository.addItem(tripId, "Passport", 1, person, null);
+        long reassignedLater = repository.addItem(tripId, "Charger", 1, person, main);
+        PackingRepository.UndoToken undo = repository.deleteBag(tripId, main);
+        long baglessAfter = repository.addItem(tripId, "Book", 1, null, null);
+        repository.updateItem(tripId, affected, "USB cable", 3, person, null);
+        repository.setPacked(tripId, affected, true);
+        repository.updateItem(tripId, reassignedLater, "Charger", 2, person, spare);
+
+        assertTrue(repository.undo(undo));
+        Trip trip = new PackingRepository(storage).getTrip(tripId);
+        assertEquals(Arrays.asList(affected, baglessBefore, reassignedLater, baglessAfter), ids(trip.items));
+        assertEquals(Long.valueOf(main), find(trip, affected).bagId);
+        assertEquals(Long.valueOf(person), find(trip, affected).personId);
+        assertEquals("USB cable", find(trip, affected).name);
+        assertEquals(3, find(trip, affected).quantity);
+        assertTrue(find(trip, affected).packed);
+        assertNull(find(trip, baglessBefore).bagId);
+        assertEquals(Long.valueOf(person), find(trip, baglessBefore).personId);
+        assertNull(find(trip, baglessAfter).bagId);
+        assertNull(find(trip, baglessAfter).personId);
+        assertEquals(Long.valueOf(spare), find(trip, reassignedLater).bagId);
+        assertEquals(2, find(trip, reassignedLater).quantity);
+    }
+
     @Test public void itemEditUndoRestoresOnlyFieldsNotChangedAgain() {
         long item = repository.addItem(tripId, "Cable", 1, null, null);
         PackingRepository.UndoToken undo = repository.updateItem(tripId, item, "USB cable", 2, null, null);
