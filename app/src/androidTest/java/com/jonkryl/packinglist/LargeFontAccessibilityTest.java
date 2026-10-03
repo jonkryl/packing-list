@@ -21,29 +21,34 @@ public final class LargeFontAccessibilityTest {
         locale("en");
         assertOffline();
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            scenario.onActivity(activity -> {
-                assertEquals(2f, activity.getResources().getConfiguration().fontScale, 0.01f);
-                View add = activity.findViewById(R.id.add_button);
-                assertTrue(add.getHeight() >= 48 * activity.getResources().getDisplayMetrics().density);
-            });
-            assertEquals(TITLE, trip(scenario).title);
-            clickMainId("remaining_filter");
-            view(R.id.remaining_filter).check(matches(isChecked()));
-            screenshot("07-en-font-200-remaining");
-            clickMainId("remaining_filter");
+            try {
+                scenario.onActivity(activity -> {
+                    assertEquals(2f, activity.getResources().getConfiguration().fontScale, 0.01f);
+                    View add = activity.findViewById(R.id.add_button);
+                    assertTrue(add.getHeight() >= 48 * activity.getResources().getDisplayMetrics().density);
+                });
+                assertEquals(TITLE, trip(scenario).title);
+                clickMainId("remaining_filter");
+                view(R.id.remaining_filter).check(matches(isChecked()));
+                screenshot("07-en-font-200-remaining");
+                clickMainId("remaining_filter");
 
-            view(R.id.add_button).perform(click());
-            input(R.id.item_name, "Large font check");
-            input(R.id.item_quantity, "2");
-            view(R.id.bag_spinner).perform(scrollTo());
-            UiObject2 bag = device().findObject(By.res(PACKAGE, "bag_spinner"));
-            assertInsideScreen(bag);
-            screenshot("08-en-font-200-form");
-            view(android.R.id.button2).perform(click());
-            assertEquals(3, trip(scenario).items.size());
-            chooseLanguage("ru");
-            screenshot("09-ru-font-200-trip");
-            view(R.id.add_button).check(matches(withText("＋ Добавить вещь")));
+                view(R.id.add_button).perform(click());
+                input(R.id.item_name, "Large font check");
+                input(R.id.item_quantity, "2");
+                view(R.id.bag_spinner).perform(scrollTo());
+                UiObject2 bag = device().findObject(By.res(PACKAGE, "bag_spinner"));
+                assertInsideScreen(bag);
+                screenshot("08-en-font-200-form");
+                view(android.R.id.button2).perform(click());
+                assertEquals(3, trip(scenario).items.size());
+                chooseLanguage("ru");
+                screenshot("09-ru-font-200-trip");
+                view(R.id.add_button).check(matches(withText("＋ Добавить вещь")));
+            } catch (Exception | AssertionError failure) {
+                captureFailure("failure-font-api" + android.os.Build.VERSION.SDK_INT);
+                throw failure;
+            }
         }
     }
 }

@@ -6,7 +6,11 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.view.View;
+import android.view.ViewParent;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.espresso.Root;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.ViewInteraction;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -23,6 +27,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.allOf;
 import static org.junit.Assert.*;
 
 final class JourneySupport {
@@ -152,11 +157,58 @@ final class JourneySupport {
         focusedView(withText(value)).perform(click());
     }
 
+    private static Rect screenBounds(View target) {
+        int[] origin = new int[2];
+        target.getLocationOnScreen(origin);
+        return new Rect(origin[0], origin[1], origin[0] + target.getWidth(), origin[1] + target.getHeight());
+    }
+
+    private static ViewAction fullyRevealMainTarget() {
+        return new ViewAction() {
+            @Override public Matcher<View> getConstraints() {
+                return isDescendantOfA(withId(R.id.main_list));
+            }
+            @Override public String getDescription() {
+                return "scroll by the measured offset to fully reveal the target in the packing RecyclerView";
+            }
+            @Override public void perform(UiController controller, View target) {
+                ViewParent parent = target.getParent();
+                while (!(parent instanceof RecyclerView) && parent != null) parent = parent.getParent();
+                assertTrue("Packing target must belong to the RecyclerView", parent instanceof RecyclerView);
+                RecyclerView list = (RecyclerView) parent;
+                Rect viewport = new Rect();
+                assertTrue("Packing RecyclerView must have a visible viewport", list.getLocalVisibleRect(viewport));
+                viewport.left = Math.max(viewport.left, list.getPaddingLeft());
+                viewport.top = Math.max(viewport.top, list.getPaddingTop());
+                viewport.right = Math.min(viewport.right, list.getWidth() - list.getPaddingRight());
+                viewport.bottom = Math.min(viewport.bottom, list.getHeight() - list.getPaddingBottom());
+                Rect listBounds = screenBounds(list);
+                viewport.offset(listBounds.left, listBounds.top);
+                Rect before = screenBounds(target);
+                assertTrue("Packing target must fit inside the actual list viewport",
+                        before.width() <= viewport.width() && before.height() <= viewport.height());
+                int dy = before.top < viewport.top ? before.top - viewport.top
+                        : before.bottom > viewport.bottom ? before.bottom - viewport.bottom : 0;
+                android.util.Log.i("SobranoJourney", "Reveal packing target before=" + before.toShortString()
+                        + " viewport=" + viewport.toShortString() + " scrollY=" + dy);
+                list.scrollBy(0, dy);
+                controller.loopMainThreadUntilIdle();
+                Rect after = screenBounds(target);
+                assertTrue("Measured scroll must fully expose the packing target: " + after.toShortString(),
+                        viewport.contains(after));
+                assertTrue("Packing target must be completely displayed before the real click",
+                        isCompletelyDisplayed().matches(target));
+            }
+        };
+    }
+
     static void mainText(String value) throws Exception {
         assertTrue("Packing list could not scroll to " + value,
                 scrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
                         .setMaxSearchSwipes(20).scrollTextIntoView(value));
         device().waitForIdle();
+        focusedView(allOf(withText(value), isDescendantOfA(withId(R.id.main_list))))
+                .perform(fullyRevealMainTarget());
     }
 
     static void mainId(String value) throws Exception {
@@ -164,6 +216,10 @@ final class JourneySupport {
                 scrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
                         .setMaxSearchSwipes(20).scrollIntoView(new UiSelector().resourceId(PACKAGE + ":id/" + value)));
         device().waitForIdle();
+        int id = InstrumentationRegistry.getInstrumentation().getTargetContext()
+                .getResources().getIdentifier(value, "id", PACKAGE);
+        assertNotEquals("Expected packing control ID", 0, id);
+        view(id).perform(fullyRevealMainTarget());
     }
 
     static void clickMainId(String value) throws Exception {
