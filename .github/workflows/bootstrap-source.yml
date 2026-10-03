@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      SOURCE_SHA: ecdf6707af3e9e06f7aa4a4ae9570f19ce5d5f83ba02c746eb44e367f7dee6b3
+      SOURCE_SHA: f80d6c5a03e8f20bc627281634f780d39a06559a4bc6fea78c127b984f29c1d7
       SOURCE_ARCHIVE: source-bootstrap.tar.gz
       BOOTSTRAP_WORKFLOW: .github/workflows/bootstrap-source.yml
     steps:
