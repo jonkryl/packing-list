@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "packageName": "com.jonkryl.packinglist",
-  "preparedOn": "2026-10-03",
-  "status": "final_prepared_choices_not_submitted",
+  "preparedOn": "2026-10-06",
+  "status": "appmetrica_update_prepared_not_submitted",
   "privacyPolicyUrl": "https://jonkryl.github.io/packing-list/privacy/",
   "sourceConfiguration": {
     "sdk": "com.yandex.android:mobileads:8.5.0",
@@ -27,7 +27,21 @@
     "export": "Explicit Android ACTION_SEND chooser; receiving app selected by user",
     "deletion": "Delete local trip/item with undo; clearing Android app data deletes all records and privacy preferences",
     "backup": "allowBackup=false in app manifest; no developer recovery",
-    "retrials": "A single controller banner, 45s watchdog and three sequential retries after 10/30/60s; recovery on foreground or restored network; slot reserved during failures"
+    "retrials": "A single controller banner, 45s watchdog and three sequential retries after 10/30/60s; recovery on foreground or restored network; slot reserved during failures",
+    "appMetrica": {
+      "sdk": "io.appmetrica.analytics:analytics:8.5.1",
+      "releaseOnly": true,
+      "installationAndSessionAnalytics": true,
+      "locationTracking": false,
+      "advertisingIdentifiersTracking": false,
+      "crashReporting": false,
+      "nativeCrashReporting": false,
+      "anrMonitoring": false,
+      "purchaseAutoTracking": false,
+      "customEvents": false,
+      "userContentSent": false,
+      "personalizationChoiceDisablesAnalytics": false
+    }
   },
   "appAccess": {
     "allFunctionalityAvailableWithoutSpecialAccess": true,
@@ -58,7 +72,8 @@
       "collected": true,
       "shared": true,
       "purposes": [
-        "Advertising or marketing"
+        "Advertising or marketing",
+        "Analytics"
       ],
       "requiredOrOptional": "Required",
       "ephemeral": false,
@@ -74,7 +89,8 @@
       "collected": true,
       "shared": true,
       "purposes": [
-        "Advertising or marketing"
+        "Advertising or marketing",
+        "Analytics"
       ],
       "requiredOrOptional": "Required",
       "ephemeral": false,
@@ -103,10 +119,8 @@
       "Installed app inventory"
     ],
     "sdkPublishedNoCollection": [
-      "App interactions",
       "Crash logs",
-      "Diagnostics",
-      "Other app performance data"
+      "Diagnostics"
     ],
     "manualShare": "Local-only processing is not off-device collection. Explicit user-initiated sharing is an expected transfer through the chosen Android share destination.",
     "supportEmail": "External user-initiated email only; privacy policy describes support message handling.",
@@ -122,7 +136,9 @@
       "independentSecurityReview": false,
       "selectedDataTypes": [
         "Approximate location",
-        "Device or other IDs"
+        "Device or other IDs",
+        "App interactions",
+        "Other app performance data"
       ],
       "handlingForEachSelectedType": {
         "collected": true,
@@ -130,14 +146,58 @@
         "ephemeral": false,
         "collectionRequired": true,
         "collectionPurposes": [
-          "Advertising or marketing"
+          "Advertising or marketing",
+          "Analytics"
         ],
         "sharingPurposes": [
-          "Advertising or marketing"
+          "Advertising or marketing",
+          "Analytics"
         ]
       },
-      "allOtherDataTypes": "Not selected based on local-only packing data and disabled location/analytics settings plus SDK disclosure"
-    }
+      "allOtherDataTypes": "Not selected based on local-only data and disabled AppMetrica location, ad identifiers, crash/ANR and purchase tracking; recheck actual signed release and current SDK documentation."
+    },
+    "appMetricaAnalyticsHandling": {
+      "App interactions": {
+        "collected": true,
+        "shared": true,
+        "ephemeral": false,
+        "required": true,
+        "collectionPurposes": [
+          "Analytics"
+        ],
+        "sharingPurposes": [
+          "Analytics"
+        ],
+        "basis": "Conservative disclosure of installation/session and app-open statistics; no raw record content or custom actions."
+      },
+      "Other app performance data": {
+        "collected": true,
+        "shared": true,
+        "ephemeral": false,
+        "required": true,
+        "collectionPurposes": [
+          "Analytics"
+        ],
+        "sharingPurposes": [
+          "Analytics"
+        ],
+        "basis": "Technical device/OS/app information sent by the SDK; crash and ANR reports disabled."
+      },
+      "Device or other IDs": {
+        "collected": true,
+        "shared": true,
+        "ephemeral": false,
+        "required": true,
+        "collectionPurposes": [
+          "Analytics"
+        ],
+        "sharingPurposes": [
+          "Analytics"
+        ],
+        "basis": "Technical analytics identifier; advertising identifier collection disabled in AppMetrica."
+      }
+    },
+    "appMetricaNotes": "Prepared source-backed disclosure, not a submitted Play Console answer. AppMetrica analytics are required in this implementation because there is no analytics opt-out; the advertising personalization choice does not stop these statistics. Verify final release and update the actual Play form before publishing the release."
   },
   "contentRating": {
     "category": "Other / utility application",
@@ -228,6 +288,10 @@
     {
       "title": "Google content ratings",
       "url": "https://support.google.com/googleplay/android-developer/answer/9859655?hl=en"
+    },
+    {
+      "title": "AppMetrica Google Play data safety",
+      "url": "https://appmetrica.yandex.com/docs/en/data-security/google-data-safety"
     }
   ],
   "declarationBasis": "Actual app source, exact SDK8.5.0 Advertising ID API evidence and cited primary provider/platform documentation. Conservatively includes residual advertising identifiers and IP-derived approximate region in both ad modes."
