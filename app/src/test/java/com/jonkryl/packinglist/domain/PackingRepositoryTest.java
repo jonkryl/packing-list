@@ -94,6 +94,55 @@ public class PackingRepositoryTest {
         assertEquals(Arrays.asList(first, second, third), ids(repository.visibleItems(tripId, true, Grouping.NONE)));
     }
 
+    @Test public void searchMatchesItemPersonAndBagWithoutChangingSavedItems() {
+        long nina = repository.addPerson(tripId, "Нина");
+        long alex = repository.addPerson(tripId, "Alex");
+        long backpack = repository.addBag(tripId, "Красный рюкзак");
+        long first = repository.addItem(tripId, "Зарядка", 1, nina, backpack);
+        long second = repository.addItem(tripId, "Зарядка", 2, alex, null);
+        long passport = repository.addItem(tripId, "Passport", 1, null, null);
+        Trip trip = repository.getTrip(tripId);
+        int writes = storage.writes;
+
+        assertEquals(Arrays.asList(first, second), ids(PackingLogic.visibleItems(trip, false, Grouping.NONE, "  ЗАРЯД  ")));
+        assertEquals(Arrays.asList(first), ids(PackingLogic.visibleItems(trip, false, Grouping.NONE, "нина  рюкзак")));
+        assertEquals(Arrays.asList(second), ids(PackingLogic.visibleItems(trip, false, Grouping.NONE, "Alex заряд")));
+        assertEquals(Arrays.asList(passport), ids(PackingLogic.visibleItems(trip, false, Grouping.NONE, "PASS")));
+        assertTrue(PackingLogic.visibleItems(trip, false, Grouping.NONE, "Missing").isEmpty());
+        assertEquals(Arrays.asList(first, second, passport), ids(PackingLogic.visibleItems(trip, false, Grouping.NONE, "  ")));
+        assertEquals(writes, storage.writes);
+        assertEquals(Arrays.asList(first, second, passport), ids(new PackingRepository(storage).getTrip(tripId).items));
+        assertTrue(repository.exportTrip(tripId, true).contains("Passport"));
+    }
+
+    @Test public void searchCombinesWithRemainingAndGroupingWithoutEmptyGroups() {
+        long person = repository.addPerson(tripId, "Alex");
+        long bag = repository.addBag(tripId, "Cabin");
+        long packed = repository.addItem(tripId, "Cable", 1, person, bag);
+        long remaining = repository.addItem(tripId, "Cable", 2, null, bag);
+        repository.addItem(tripId, "Passport", 1, person, null);
+        repository.setPacked(tripId, packed, true);
+        Trip trip = repository.getTrip(tripId);
+
+        List<ItemGroup> groups = PackingLogic.groups(trip, true, Grouping.PERSON, true, "cabin cable");
+        assertEquals(1, groups.size());
+        assertEquals("Unassigned", groups.get(0).label);
+        assertEquals(Arrays.asList(remaining), ids(groups.get(0).items));
+        assertEquals(Arrays.asList(packed, remaining), ids(PackingLogic.visibleItems(trip, false, Grouping.BAG, "cabin cable")));
+        assertTrue(PackingLogic.groups(trip, true, Grouping.BAG, true, "missing").isEmpty());
+    }
+
+    @Test public void searchCaseFoldingDoesNotDependOnDeviceLocale() {
+        long item = repository.addItem(tripId, "ID card", 1, null, null);
+        java.util.Locale before = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+            assertEquals(Arrays.asList(item), ids(PackingLogic.visibleItems(repository.getTrip(tripId), false, Grouping.NONE, "ID")));
+        } finally {
+            java.util.Locale.setDefault(before);
+        }
+    }
+
     @Test public void groupingUsesPeopleAndBagsOrderWithUnassignedLast() {
         long firstPerson = repository.addPerson(tripId, "Zoe");
         long secondPerson = repository.addPerson(tripId, "Amy");

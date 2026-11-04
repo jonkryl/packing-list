@@ -1,0 +1,4 @@
+Find items by name, person or bag.
+Quickly undo an accidental packing checkmark.
+Search stays in place when the screen rotates. Improved empty-list messages.
+Wide windows show trips beside their packing lists. Tablet forms have a readable width, and rotation preserves your reading position and main editor drafts.

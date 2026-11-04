@@ -23,6 +23,7 @@ import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 import static androidx.test.espresso.Espresso.*;
 import static androidx.test.espresso.action.ViewActions.*;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static org.hamcrest.Matchers.equalTo;
@@ -163,7 +164,7 @@ final class JourneySupport {
         return new Rect(origin[0], origin[1], origin[0] + target.getWidth(), origin[1] + target.getHeight());
     }
 
-    private static ViewAction fullyRevealMainTarget() {
+    static ViewAction fullyRevealMainTarget() {
         return new ViewAction() {
             @Override public Matcher<View> getConstraints() {
                 return isDescendantOfA(withId(R.id.main_list));
@@ -211,6 +212,12 @@ final class JourneySupport {
                 .perform(fullyRevealMainTarget());
     }
 
+    static void clickPackingMark(long itemId) {
+        focusedView(allOf(withTagValue(equalTo("packed_" + itemId)),
+                isDescendantOfA(withId(R.id.main_list))))
+                .perform(fullyRevealMainTarget(), click());
+    }
+
     static void mainId(String value) throws Exception {
         assertTrue("Packing control is absent: " + value,
                 scrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
@@ -231,7 +238,12 @@ final class JourneySupport {
     }
 
     static void input(int id, String value) {
-        view(id).perform(scrollTo(), replaceText(value), androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
+        ViewInteraction field = view(id);
+        // The compact search dialog has no ScrollView; its input is already visible.
+        if (id == R.id.search_query) field.check(matches(isCompletelyDisplayed()));
+        else field.perform(scrollTo());
+        field.check(matches(isEnabled())).perform(replaceText(value),
+                androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
     }
 
     static void save() {
@@ -296,7 +308,8 @@ final class JourneySupport {
     static void tripMenu(String title) throws Exception {
         mainId("owners_button");
         UiObject2 action = device().wait(Until.findObject(By.desc("Trip actions " + title)), 5000);
-        assertNotNull(action); focusedView(withContentDescription("Trip actions " + title)).perform(click());
+        assertNotNull(action); focusedView(allOf(withContentDescription("Trip actions " + title),
+                isDescendantOfA(withId(R.id.main_list)))).perform(fullyRevealMainTarget(), click());
     }
 
     static void openOriginalFromHome() throws Exception {

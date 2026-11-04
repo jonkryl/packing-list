@@ -48,7 +48,7 @@ public final class PackingJourneyTest {
             mainText("Bottle × 1");
             long[] idsBefore = adapterIds(scenario);
             long packedId = initial.items.get(0).id;
-            focusedView(withTagValue(is("packed_" + packedId))).perform(click());
+            clickPackingMark(packedId);
             assertTrue(trip(scenario).items.get(0).packed);
             assertArrayEquals("Packing marks must retain row IDs and order", idsBefore, adapterIds(scenario));
             screenshot("01-en-trip");
@@ -58,7 +58,27 @@ public final class PackingJourneyTest {
                     activity.repositoryForTests().visibleItems(activity.currentTripIdForTests(), true, Grouping.NONE).size()));
             assertFalse("Packed row is filtered from the adapter", containsId(adapterIds(scenario), packedId));
             screenshot("02-en-remaining");
+            scenario.recreate();
+            view(R.id.undo_button).check(matches(isDisplayed())).perform(click());
+            assertFalse("Undo restores an accidentally packed item after rotation", trip(scenario).items.get(0).packed);
+            assertTrue("Undo brings the item back while the remaining filter stays enabled", containsId(adapterIds(scenario), packedId));
+            mainText("Bottle × 1");
+            clickPackingMark(packedId);
+            assertTrue(trip(scenario).items.get(0).packed);
             clickMainId("remaining_filter");
+
+            clickMainId("search_button");
+            input(R.id.search_query, "BORIS day"); view(android.R.id.button1).perform(click());
+            assertTrue(containsId(adapterIds(scenario), initial.items.get(1).id));
+            assertFalse(containsId(adapterIds(scenario), initial.items.get(0).id));
+            assertFalse(containsId(adapterIds(scenario), initial.items.get(2).id));
+            scenario.recreate();
+            assertFalse("Search remains applied after rotation", containsId(adapterIds(scenario), initial.items.get(0).id));
+            clickMainId("search_button");
+            view(R.id.search_query).check(matches(withText("BORIS day")));
+            view(android.R.id.button3).perform(click());
+            assertTrue(containsId(adapterIds(scenario), initial.items.get(0).id));
+            assertTrue(containsId(adapterIds(scenario), initial.items.get(2).id));
 
             mainText("Bottle × 1"); clickText("Bottle × 1");
             input(R.id.item_quantity, "3"); save();
@@ -69,7 +89,7 @@ public final class PackingJourneyTest {
             input(R.id.item_quantity, "3"); save();
 
             mainText("Passport × 1");
-            focusedView(withContentDescription("Item actions Passport")).perform(click());
+            focusedView(withContentDescription("Item actions Passport")).perform(fullyRevealMainTarget(), click());
             clickText("Delete item");
             assertEquals(2, trip(scenario).items.size());
             scenario.recreate();
@@ -109,6 +129,7 @@ public final class PackingJourneyTest {
             view(R.id.reset_marks).perform(scrollTo(), click());
             save();
             assertEquals(1, trip(scenario).packedCount());
+            deletedTripFiltersDoNotHideNewTemplate(scenario);
             openOriginalFromHome();
             assertEquals(TITLE, trip(scenario).title);
             assertEquals(1, trip(scenario).packedCount());
@@ -141,6 +162,45 @@ public final class PackingJourneyTest {
             assertEquals(TITLE, trip(restored).title);
             assertEquals(1, trip(restored).packedCount());
             assertEquals(3, trip(restored).items.get(0).quantity);
+        }
+    }
+
+    private void deletedTripFiltersDoNotHideNewTemplate(ActivityScenario<MainActivity> scenario) throws Exception {
+        focusedView(withContentDescription("All trips")).perform(click());
+        view(R.id.add_button).perform(click());
+        input(R.id.trip_name, "Filtered trip"); save();
+        addItem("Passport", "1", "Shared / no person", "No bag");
+        long deletedId = trip(scenario).id;
+        clickMainId("search_button");
+        input(R.id.search_query, "passport"); view(android.R.id.button1).perform(click());
+        clickMainId("remaining_filter");
+        clickMainId("group_button"); clickText("By bag");
+        tripMenu("Filtered trip"); clickText("Delete trip"); view(android.R.id.button1).perform(click());
+        scenario.onActivity(activity -> {
+            assertEquals("Deleting the open trip returns to the trip list", -1L, activity.currentTripIdForTests());
+            assertNull(activity.repositoryForTests().getTrip(deletedId));
+        });
+        view(R.id.undo_button).check(matches(isDisplayed()));
+
+        view(R.id.add_button).perform(click());
+        input(R.id.trip_name, "Fresh weekend");
+        spinner(R.id.template_spinner, "Weekend"); save();
+        Trip fresh = trip(scenario);
+        assertTrue("The new template must contain items unrelated to the old search", fresh.items.size() > 1);
+        for (Item item : fresh.items) {
+            assertTrue("Every template item is visible after deleting a filtered trip",
+                    containsId(adapterIds(scenario), item.id));
+        }
+        mainId("search_button");
+        view(R.id.search_button).check(matches(withText("Find item")));
+        mainId("remaining_filter");
+        view(R.id.remaining_filter).check(matches(isNotChecked()));
+        mainId("group_button");
+        view(R.id.group_button).check(matches(withText("Group: in order")));
+        scenario.recreate();
+        for (Item item : fresh.items) {
+            assertTrue("The new trip keeps its unfiltered state after rotation",
+                    containsId(adapterIds(scenario), item.id));
         }
     }
 
