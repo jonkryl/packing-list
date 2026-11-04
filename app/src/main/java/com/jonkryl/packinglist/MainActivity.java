@@ -109,7 +109,7 @@ public final class MainActivity extends ComponentActivity {
     private LinearLayout row(){LinearLayout v=new LinearLayout(this);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private TextView text(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(INK);if(bold)v.setTypeface(null,Typeface.BOLD);v.setIncludeFontPadding(true);return v;}
-    private Button button(String s,View.OnClickListener click){Button b=new Button(this);b.setText(s);b.setTextSize(16);b.setAllCaps(false);b.setMaxLines(Integer.MAX_VALUE);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setTextColor(TEAL);b.setOnClickListener(click);return b;}
+    private Button button(String s,View.OnClickListener click){Button b=new Button(this);b.setStateListAnimator(null);b.setElevation(0f);b.setTranslationZ(0f);b.setText(s);b.setTextSize(16);b.setAllCaps(false);b.setMaxLines(Integer.MAX_VALUE);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setTextColor(TEAL);b.setOnClickListener(click);return b;}
     private void restoreAnchor(){if(restoredRow==Long.MIN_VALUE)return;int position=rowIndex(restoredRow);if(position>=0)((LinearLayoutManager)list.getLayoutManager()).scrollToPositionWithOffset(position,restoredOffset);restoredRow=Long.MIN_VALUE;}
     private final class Workspace extends LinearLayout {
         Workspace(){super(MainActivity.this);setOrientation(VERTICAL);}
