@@ -8,6 +8,8 @@ The app menu lets users choose Russian, English or the system language. The acti
 
 Within a trip, Find item searches item names, people and bags together and works with the remaining-items filter and grouping. Search survives Activity recreation and never changes the saved list or its export. Packing marks can be undone immediately, including when the marked item has disappeared from the remaining-items view.
 
+The workspace uses the available window width: at 840dp and above, a trip navigator sits beside the packing list; narrower windows use a centered single column. Editors stay at a readable width and resize for the keyboard. The selected trip, search, filters, undo, stable reading anchor and trip/item/search/copy editor drafts survive Activity recreation.
+
 ## Build and verification
 
 The project uses Java 17, Android Gradle Plugin 8.13.2, Gradle 8.13 and Android SDK 36. The checked-in wrapper verifies the Gradle distribution SHA-256. Gradle is limited to two workers and a 2 GB JVM.
@@ -23,5 +25,7 @@ Set repository/environment secrets `UPLOAD_KEYSTORE_BASE64`, `UPLOAD_STORE_PASSW
 That workflow first passes the complete CI suite, then runs release lint and builds signed APK/AAB. Signing material is decoded only under `runner.temp` and removed after the job. Release builds reject missing signing material or a demo banner ID. The `signed-release-*` artifact contains both binaries, SHA-256 sums, exact upload-certificate checks, decoded package/version/min/target SDK proof, APK zip alignment and APK/AAB 64-bit ELF 16 KB checks.
 
 CI artifacts and a GitHub download do not establish Google Play production publication or paid ad serving. Play track/country status and the Yandex app's Active status must be recorded from the actual consoles in the release manifest.
+
+The API36 tablet profile additionally runs a guarded real-device journey when the configured display width is at least 600dp. It checks navigation, packing and undo, rotation between wide and narrow windows, stable reading position, bounded editor and real soft keyboard, and editor draft restoration. This test requires `ownedPortfolioEmulator=true`, the debug demo build and an emulator; it never prepares fixtures on a physical device.
 
 Contact: <jonkryl@gmail.com>.

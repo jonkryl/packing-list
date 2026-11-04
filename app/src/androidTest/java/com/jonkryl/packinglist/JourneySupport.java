@@ -308,7 +308,8 @@ final class JourneySupport {
     static void tripMenu(String title) throws Exception {
         mainId("owners_button");
         UiObject2 action = device().wait(Until.findObject(By.desc("Trip actions " + title)), 5000);
-        assertNotNull(action); focusedView(withContentDescription("Trip actions " + title)).perform(click());
+        assertNotNull(action); focusedView(allOf(withContentDescription("Trip actions " + title),
+                isDescendantOfA(withId(R.id.main_list)))).perform(fullyRevealMainTarget(), click());
     }
 
     static void openOriginalFromHome() throws Exception {
