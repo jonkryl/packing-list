@@ -34,6 +34,17 @@ public final class MainActivity extends ComponentActivity {
     private RecyclerView list;
     private Rows adapter;
     private LinearLayout root, undoBar;
+    private FrameLayout windowHost;
+    private LinearLayout tripPane;
+    private RecyclerView tripNavigation;
+    private TripNavigation navigationAdapter;
+    private boolean expanded;
+    private long restoredRow=Long.MIN_VALUE;
+    private int restoredOffset;
+    private AlertDialog editor;
+    private String editorKind;
+    private long editorId=-1;
+    private Bundle restoredEditor;
     private TextView title;
     private Button action, back;
     private BannerController banner;
@@ -56,38 +67,54 @@ public final class MainActivity extends ComponentActivity {
         english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("ru");
         packingState=new ViewModelProvider(this,new PackingState.Factory(getApplication())).get(PackingState.class);
         repository=packingState.repository;
-        if(state!=null){ tripId=state.getLong("trip",-1); remaining=state.getBoolean("remaining"); grouping=Grouping.valueOf(state.getString("group","NONE")); query=state.getString("query",""); }
+        if(state!=null){ tripId=state.getLong("trip",-1); remaining=state.getBoolean("remaining"); grouping=Grouping.valueOf(state.getString("group","NONE")); query=state.getString("query",""); restoredRow=state.getLong("anchor_id",Long.MIN_VALUE);restoredOffset=state.getInt("anchor_offset");restoredEditor=state.getBundle("editor"); }
         else tripId=getPreferences(0).getLong("trip",-1);
         tripBack=new OnBackPressedCallback(tripId>=0){
             @Override public void handleOnBackPressed(){goHome();}
         };
         getOnBackPressedDispatcher().addCallback(this,tripBack);
-        root=column(); root.setBackgroundColor(PAPER);
-        ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{androidx.core.graphics.Insets s=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(s.left,s.top,s.right,s.bottom);return insets;});
+        windowHost=new FrameLayout(this);windowHost.setBackgroundColor(PAPER);
+        ViewCompat.setOnApplyWindowInsetsListener(windowHost,(v,insets)->{androidx.core.graphics.Insets s=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout());androidx.core.graphics.Insets ime=insets.getInsets(WindowInsetsCompat.Type.ime());v.setPadding(s.left,s.top,s.right,Math.max(s.bottom,ime.bottom));return insets;});
+        root=new Workspace();root.setId(R.id.workspace);
+        windowHost.addView(root,new FrameLayout.LayoutParams(-1,-1,Gravity.TOP|Gravity.CENTER_HORIZONTAL));
         LinearLayout bar=row(); bar.setPadding(dp(12),dp(6),dp(12),dp(6));
         back=button("‹",v->goHome()); back.setContentDescription(t("Все поездки","All trips")); bar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
         title=text(t("Собрано","Packed"),22,true); bar.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button menu=button("⋮",this::appMenu); menu.setContentDescription(t("Меню","Menu"));bar.addView(menu,new LinearLayout.LayoutParams(dp(48),dp(48)));root.addView(bar);
+        LinearLayout body=row();root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+        tripPane=column();tripPane.setId(R.id.trip_pane);tripPane.setPadding(dp(16),dp(8),dp(8),dp(8));tripPane.setVisibility(View.GONE);
+        tripPane.addView(text(t("Поездки","Trips"),22,true));
+        tripNavigation=new RecyclerView(this);tripNavigation.setId(R.id.trip_navigation);tripNavigation.setLayoutManager(new LinearLayoutManager(this));tripNavigation.setItemAnimator(null);
+        navigationAdapter=new TripNavigation();tripNavigation.setAdapter(navigationAdapter);tripPane.addView(tripNavigation,new LinearLayout.LayoutParams(-1,0,1));
+        Button newTrip=button(t("＋ Новая поездка","＋ New trip"),v->tripEditor(null));newTrip.setId(R.id.new_trip_button);tripPane.addView(newTrip,new LinearLayout.LayoutParams(-1,-2));
+        body.addView(tripPane,new LinearLayout.LayoutParams(dp(280),-1));
+        LinearLayout detail=column();detail.setId(R.id.detail_pane);body.addView(detail,new LinearLayout.LayoutParams(0,-1,1));
         list=new RecyclerView(this); list.setId(R.id.main_list);list.setLayoutManager(new LinearLayoutManager(this));list.setItemAnimator(null);
-        adapter=new Rows(); list.setAdapter(adapter);root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        undoBar=row();undoBar.setPadding(dp(12),0,dp(12),0);undoBar.setBackgroundColor(0xffdcebe3);root.addView(undoBar);undoBar.setVisibility(View.GONE);
+        adapter=new Rows(); list.setAdapter(adapter);detail.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        undoBar=row();undoBar.setPadding(dp(12),0,dp(12),0);undoBar.setBackgroundColor(0xffdcebe3);detail.addView(undoBar);undoBar.setVisibility(View.GONE);
         action=button("",v->{if(tripId<0)tripEditor(null);else itemEditor(null);}); action.setId(R.id.add_button);action.setTextColor(Color.WHITE);action.setBackground(round(TEAL,16));
-        LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.setMargins(dp(16),dp(8),dp(16),dp(12));root.addView(action,ap);
+        LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.setMargins(dp(16),dp(8),dp(16),dp(12));detail.addView(action,ap);
         FrameLayout ad=new FrameLayout(this);ad.setId(R.id.ad_container);root.addView(ad,new LinearLayout.LayoutParams(-1,-2));
-        setContentView(root);banner=new BannerController(this);banner.attach(ad);refresh(false);
+        setContentView(windowHost);banner=new BannerController(this);banner.attach(ad);refresh(false);
         if(packingState.undo!=null)offerUndo(packingState.undo);
+        list.post(()->{restoreAnchor();restoreEditor();});
     }
     @Override protected void onStart(){super.onStart();if(banner!=null)banner.onStart();}
     @Override protected void onStop(){if(banner!=null)banner.onStop();super.onStop();}
-    @Override protected void onDestroy(){if(banner!=null)banner.destroy();super.onDestroy();}
-    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putLong("trip",tripId);b.putBoolean("remaining",remaining);b.putString("group",grouping.name());b.putString("query",query);}
+    @Override protected void onDestroy(){if(editor!=null)editor.dismiss();if(banner!=null)banner.destroy();super.onDestroy();}
+    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putLong("trip",tripId);b.putBoolean("remaining",remaining);b.putString("group",grouping.name());b.putString("query",query);LinearLayoutManager lm=(LinearLayoutManager)list.getLayoutManager();int first=lm.findFirstVisibleItemPosition();if(first>=0&&first<adapter.data.size()){View anchor=lm.findViewByPosition(first);b.putLong("anchor_id",adapter.data.get(first).id);b.putInt("anchor_offset",anchor==null?0:anchor.getTop()-list.getPaddingTop());}if(editor!=null&&editor.isShowing()&&editorKind!=null){Bundle draft=new Bundle();draft.putString("kind",editorKind);draft.putLong("id",editorId);draft.putBundle("window",editor.onSaveInstanceState());b.putBundle("editor",draft);}}
     private String t(String ru,String en){return english?en:ru;}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
     private LinearLayout row(){LinearLayout v=new LinearLayout(this);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private TextView text(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(INK);if(bold)v.setTypeface(null,Typeface.BOLD);v.setIncludeFontPadding(true);return v;}
-    private Button button(String s,View.OnClickListener click){Button b=new Button(this);b.setText(s);b.setTextSize(16);b.setAllCaps(false);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setTextColor(TEAL);b.setOnClickListener(click);return b;}
+    private Button button(String s,View.OnClickListener click){Button b=new Button(this);b.setStateListAnimator(null);b.setElevation(0f);b.setTranslationZ(0f);b.setText(s);b.setTextSize(16);b.setAllCaps(false);b.setMaxLines(Integer.MAX_VALUE);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setTextColor(TEAL);b.setOnClickListener(click);return b;}
+    private void restoreAnchor(){if(restoredRow==Long.MIN_VALUE)return;int position=rowIndex(restoredRow);if(position>=0)((LinearLayoutManager)list.getLayoutManager()).scrollToPositionWithOffset(position,restoredOffset);restoredRow=Long.MIN_VALUE;}
+    private final class Workspace extends LinearLayout {
+        Workspace(){super(MainActivity.this);setOrientation(VERTICAL);}
+        @Override protected void onMeasure(int widthSpec,int heightSpec){int available=MeasureSpec.getSize(widthSpec);boolean wide=available>=dp(840);if(wide!=expanded){expanded=wide;if(tripPane!=null)tripPane.setVisibility(wide?View.VISIBLE:View.GONE);}super.onMeasure(MeasureSpec.makeMeasureSpec(Math.min(available,dp(wide?1200:720)),MeasureSpec.EXACTLY),heightSpec);}
+    }
     private void resetTripFilters(){remaining=false;grouping=Grouping.NONE;query="";}
     private void goHome(){tripId=-1;resetTripFilters();refresh(false);}
     private void openTrip(long id){tripId=id;resetTripFilters();refresh(false);}
@@ -107,6 +134,7 @@ public final class MainActivity extends ComponentActivity {
             if(PackingLogic.visibleItems(trip,remaining,grouping,query).isEmpty())adapter.data.add(new Entry(-3,"empty",emptyMessage(trip)));
         }
         adapter.notifyDataSetChanged();
+        navigationAdapter.notifyDataSetChanged();
         int target=-1;if(oldFirst>=0){for(int j=oldFirst;j<oldIds.size()&&target<0;j++)target=rowIndex(oldIds.get(j));for(int j=oldFirst-1;j>=0&&target<0;j--)target=rowIndex(oldIds.get(j));}
         if(target>=0)layout.scrollToPositionWithOffset(target,offset);else list.scrollToPosition(0);
     }
@@ -126,13 +154,20 @@ public final class MainActivity extends ComponentActivity {
     }
     private void tripMenu(Trip trip,View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Изменить поездку","Edit trip")).setOnMenuItemClickListener(m->{tripEditor(trip);return true;});p.getMenu().add(t("Участники и сумки","People and bags")).setOnMenuItemClickListener(m->{manageOwners(trip);return true;});p.getMenu().add(t("Копировать поездку","Copy trip")).setOnMenuItemClickListener(m->{copyDialog(trip);return true;});p.getMenu().add(t("Поделиться списком","Share list")).setOnMenuItemClickListener(m->{shareTrip(trip);return true;});p.getMenu().add(t("Удалить поездку","Delete trip")).setOnMenuItemClickListener(m->{new AlertDialog.Builder(this).setTitle(t("Удалить поездку?","Delete trip?")).setMessage(trip.title).setNegativeButton(t("Оставить","Keep"),null).setPositiveButton(t("Удалить","Delete"),(d,w)->safe(()->{offerUndo(repository.deleteTrip(trip.id));refresh(true);})).show();return true;});p.show();}
     public void shareTrip(Trip trip){Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_SUBJECT,trip.title);send.putExtra(Intent.EXTRA_TEXT,repository.exportTrip(trip.id,english));startActivity(Intent.createChooser(send,t("Поделиться списком","Share packing list")));}
-    private EditText field(LinearLayout box,String label,String value,int id,int type){TextView l=text(label,14,true);box.addView(l);EditText e=new EditText(this);e.setId(id);e.setText(value);e.setTextSize(18);e.setInputType(type);e.setMinHeight(dp(48));e.setTextColor(INK);box.addView(e,new LinearLayout.LayoutParams(-1,-2));return e;}
+    private EditText field(LinearLayout box,String label,String value,int id,int type){TextView l=text(label,14,true);box.addView(l);EditText e=new EditText(this);e.setId(id);e.setText(value);e.setTextSize(18);e.setInputType(type);e.setSingleLine(true);e.setMinHeight(dp(48));e.setTextColor(INK);box.addView(e,new LinearLayout.LayoutParams(-1,-2));return e;}
     private LinearLayout form(){LinearLayout b=column();b.setPadding(dp(20),dp(8),dp(20),dp(12));return b;}
-    private AlertDialog dialog(String heading,LinearLayout box){ScrollView scroll=new ScrollView(this);scroll.addView(box);return new AlertDialog.Builder(this).setTitle(heading).setView(scroll).setNegativeButton(t("Отмена","Cancel"),null).setPositiveButton(t("Сохранить","Save"),null).create();}
+    private final class FormDialog extends AlertDialog {
+        FormDialog(String heading,View content){super(MainActivity.this);setTitle(heading);setView(content);setButton(BUTTON_NEGATIVE,t("Отмена","Cancel"),(DialogInterface.OnClickListener)null);setButton(BUTTON_POSITIVE,t("Сохранить","Save"),(DialogInterface.OnClickListener)null);}
+        @Override public void show(){super.show();fitDialog(this);}
+    }
+    private void fitDialog(AlertDialog dialog){Window window=dialog.getWindow();if(window==null)return;window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);int width=windowHost.getWidth()-windowHost.getPaddingLeft()-windowHost.getPaddingRight();if(width>=dp(600))window.setLayout(Math.min(dp(560),width-dp(48)),WindowManager.LayoutParams.WRAP_CONTENT);for(int id:new int[]{AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEGATIVE,AlertDialog.BUTTON_NEUTRAL}){Button button=dialog.getButton(id);if(button!=null){button.setMinHeight(dp(48));button.setMaxLines(Integer.MAX_VALUE);}}}
+    private AlertDialog dialog(String heading,LinearLayout box){ScrollView scroll=new ScrollView(this);scroll.setId(R.id.editor_scroll);scroll.addView(box);return new FormDialog(heading,scroll);}
+    private void trackEditor(AlertDialog dialog,String kind,long id){editor=dialog;editorKind=kind;editorId=id;dialog.setOnDismissListener(ignored->{if(editor==dialog){editor=null;editorKind=null;}});}
+    private void restoreEditor(){Bundle draft=restoredEditor;restoredEditor=null;if(draft==null)return;String kind=draft.getString("kind","");long id=draft.getLong("id",-1);Trip trip=repository.getTrip(tripId);if(kind.equals("trip")){Trip selected=id<0?null:repository.getTrip(id);if(id>=0&&selected==null)return;tripEditor(selected);}else if(kind.equals("search")&&trip!=null)searchItems();else if(kind.equals("item")&&trip!=null){Item selected=null;if(id>=0){for(Item value:trip.items)if(value.id==id)selected=value;if(selected==null)return;}itemEditor(selected);}else if(kind.equals("copy")&&repository.getTrip(id)!=null)copyDialog(repository.getTrip(id));else return;Bundle state=draft.getBundle("window");if(editor!=null&&state!=null)editor.onRestoreInstanceState(state);}
     private void tripEditor(Trip trip){LinearLayout b=form();EditText name=field(b,t("Название поездки","Trip name"),trip==null?"":trip.title,R.id.trip_name,InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         EditText start=field(b,t("Начало · ГГГГ-ММ-ДД (необязательно)","Start · YYYY-MM-DD (optional)"),trip==null?"":trip.startDate,R.id.start_date,InputType.TYPE_CLASS_DATETIME);EditText end=field(b,t("Конец · ГГГГ-ММ-ДД (необязательно)","End · YYYY-MM-DD (optional)"),trip==null?"":trip.endDate,R.id.end_date,InputType.TYPE_CLASS_DATETIME);
         Spinner templates=new Spinner(this);if(trip==null){b.addView(text(t("Стартовый список","Start with"),14,true));templates.setId(R.id.template_spinner);templates.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{t("Пустой список","Empty list"),t("Выходные","Weekend"),t("Рабочая поездка","Business trip"),t("С детьми","With kids")}));b.addView(templates,new LinearLayout.LayoutParams(-1,dp(56)));b.addView(text(t("Все вещи, участники и сумки можно менять.","All items, people and bags can be changed."),14,false));}
-        AlertDialog d=dialog(trip==null?t("Новая поездка","New trip"):t("Изменить поездку","Edit trip"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim(),s=start.getText().toString().trim(),e=end.getText().toString().trim();if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}if(!validDate(s)||!validDate(e)||(!s.isEmpty()&&!e.isEmpty()&&s.compareTo(e)>0)){end.setError(t("Проверьте даты","Check dates"));return;}if(trip==null){tripId=repository.createTrip(n,s,e,Template.values()[templates.getSelectedItemPosition()],english);resetTripFilters();}else offerUndo(repository.updateTrip(trip.id,n,s,e));d.dismiss();refresh(false);})));d.show();}
+        AlertDialog d=dialog(trip==null?t("Новая поездка","New trip"):t("Изменить поездку","Edit trip"),b);trackEditor(d,"trip",trip==null?-1:trip.id);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim(),s=start.getText().toString().trim(),e=end.getText().toString().trim();if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}if(!validDate(s)||!validDate(e)||(!s.isEmpty()&&!e.isEmpty()&&s.compareTo(e)>0)){end.setError(t("Проверьте даты","Check dates"));return;}if(trip==null){tripId=repository.createTrip(n,s,e,Template.values()[templates.getSelectedItemPosition()],english);resetTripFilters();}else offerUndo(repository.updateTrip(trip.id,n,s,e));d.dismiss();refresh(false);})));d.show();}
     private boolean validDate(String s){if(s.isEmpty())return true;try{LocalDate.parse(s);return s.matches("\\d{4}-\\d{2}-\\d{2}");}catch(Exception e){return false;}}
     private String emptyMessage(Trip trip) {
         if (trip.itemCount() == 0) return t("Добавьте первую вещь.", "Add your first item.");
@@ -148,10 +183,10 @@ public final class MainActivity extends ComponentActivity {
         EditText input = field(box, t("Название вещи, участник или сумка", "Item name, person or bag"),
                 query, R.id.search_query, InputType.TYPE_CLASS_TEXT);
         input.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(160)});
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(t("Найти вещь", "Find item"))
-                .setView(box).setNegativeButton(t("Отмена", "Cancel"), null)
-                .setNeutralButton(t("Сбросить поиск", "Clear search"), null)
-                .setPositiveButton(t("Найти", "Search"), null).create();
+        AlertDialog dialog = new FormDialog(t("Найти вещь", "Find item"),box);
+        dialog.setButton(AlertDialog.BUTTON_POSITIVE,t("Найти","Search"),(DialogInterface.OnClickListener)null);
+        dialog.setButton(AlertDialog.BUTTON_NEUTRAL,t("Сбросить поиск","Clear search"),(DialogInterface.OnClickListener)null);
+        trackEditor(dialog,"search",-1);
         dialog.setOnShowListener(shown -> {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
                 query = input.getText().toString().trim();
@@ -170,7 +205,7 @@ public final class MainActivity extends ComponentActivity {
         ArrayList<Long> personIds=new ArrayList<>(),bagIds=new ArrayList<>();ArrayList<String> people=new ArrayList<>(),bags=new ArrayList<>();personIds.add(null);people.add(t("Общее / без участника","Shared / no person"));bagIds.add(null);bags.add(t("Без сумки","No bag"));for(Person p:trip.people){personIds.add(p.id);people.add(p.name);}for(Bag a:trip.bags){bagIds.add(a.id);bags.add(a.name);}
         Spinner person=select(b,t("Участник","Person"),people,R.id.person_spinner),bag=select(b,t("Сумка","Bag"),bags,R.id.bag_spinner);if(item!=null){person.setSelection(Math.max(0,personIds.indexOf(item.personId)));bag.setSelection(Math.max(0,bagIds.indexOf(item.bagId)));}
         b.addView(button(t("＋ Добавить участника","＋ Add person"),v->addOwnerFromItem(trip,true,personIds,people,person))); b.addView(button(t("＋ Добавить сумку","＋ Add bag"),v->addOwnerFromItem(trip,false,bagIds,bags,bag)));
-        AlertDialog d=dialog(item==null?t("Добавить вещь","Add item"):t("Изменить вещь","Edit item"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim();int q;try{q=Integer.parseInt(quantity.getText().toString());}catch(Exception e){q=0;}if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}if(q<1||q>9999){quantity.setError(t("От 1 до 9999","Use 1 to 9999"));return;}if(item==null)repository.addItem(trip.id,n,q,personIds.get(person.getSelectedItemPosition()),bagIds.get(bag.getSelectedItemPosition()));else offerUndo(repository.updateItem(trip.id,item.id,n,q,personIds.get(person.getSelectedItemPosition()),bagIds.get(bag.getSelectedItemPosition())));d.dismiss();refresh(true);})));d.show();}
+        AlertDialog d=dialog(item==null?t("Добавить вещь","Add item"):t("Изменить вещь","Edit item"),b);trackEditor(d,"item",item==null?-1:item.id);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim();int q;try{q=Integer.parseInt(quantity.getText().toString());}catch(Exception e){q=0;}if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}if(q<1||q>9999){quantity.setError(t("От 1 до 9999","Use 1 to 9999"));return;}if(item==null)repository.addItem(trip.id,n,q,personIds.get(person.getSelectedItemPosition()),bagIds.get(bag.getSelectedItemPosition()));else offerUndo(repository.updateItem(trip.id,item.id,n,q,personIds.get(person.getSelectedItemPosition()),bagIds.get(bag.getSelectedItemPosition())));d.dismiss();refresh(true);})));d.show();}
     private void addOwnerFromItem(Trip trip,boolean person,ArrayList<Long> ids,ArrayList<String> names,Spinner spinner){
         LinearLayout b=form();EditText name=field(b,t("Название","Name"),"",R.id.owner_name,InputType.TYPE_CLASS_TEXT);AlertDialog d=dialog(person?t("Добавить участника","Add person"):t("Добавить сумку","Add bag"),b);
         d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim();if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}long id=person?repository.addPerson(trip.id,n):repository.addBag(trip.id,n);ids.add(id);names.add(n);spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));spinner.setSelection(ids.size()-1);d.dismiss();refresh(true);})));d.show();
@@ -178,13 +213,21 @@ public final class MainActivity extends ComponentActivity {
     private Spinner select(LinearLayout b,String label,List<String> options,int id){b.addView(text(label,14,true));Spinner s=new Spinner(this);s.setId(id);s.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options));b.addView(s,new LinearLayout.LayoutParams(-1,dp(56)));return s;}
     private void itemMenu(Item item,View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add(t("Изменить вещь","Edit item")).setOnMenuItemClickListener(m->{itemEditor(item);return true;});p.getMenu().add(t("Удалить вещь","Delete item")).setOnMenuItemClickListener(m->{safe(()->{offerUndo(repository.deleteItem(tripId,item.id));refresh(true);});return true;});p.show();}
     private String copyName(String original){String suffix=t(" — копия"," — copy");int limit=Math.min(original.length(),120-suffix.length());if(limit>0&&limit<original.length()&&Character.isHighSurrogate(original.charAt(limit-1))&&Character.isLowSurrogate(original.charAt(limit)))limit--;return original.substring(0,limit)+suffix;}
-    private void copyDialog(Trip trip){LinearLayout b=form();EditText name=field(b,t("Название копии","Copy name"),copyName(trip.title),R.id.copy_name,InputType.TYPE_CLASS_TEXT);CheckBox reset=new CheckBox(this);reset.setText(t("Сбросить отметки сборки","Reset packed marks"));reset.setTextSize(16);reset.setChecked(true);reset.setMinHeight(dp(48));reset.setId(R.id.reset_marks);b.addView(reset);b.addView(text(t("Люди, сумки и количество сохранятся.","People, bags and quantities will be copied."),14,false));AlertDialog d=dialog(t("Копировать поездку","Copy trip"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{if(name.getText().toString().trim().isEmpty()){name.setError(t("Введите название","Enter a name"));return;}long copy=repository.copyTrip(trip.id,name.getText().toString(),reset.isChecked());d.dismiss();openTrip(copy);})));d.show();}
+    private void copyDialog(Trip trip){LinearLayout b=form();EditText name=field(b,t("Название копии","Copy name"),copyName(trip.title),R.id.copy_name,InputType.TYPE_CLASS_TEXT);CheckBox reset=new CheckBox(this);reset.setText(t("Сбросить отметки сборки","Reset packed marks"));reset.setTextSize(16);reset.setChecked(true);reset.setMinHeight(dp(48));reset.setId(R.id.reset_marks);b.addView(reset);b.addView(text(t("Люди, сумки и количество сохранятся.","People, bags and quantities will be copied."),14,false));AlertDialog d=dialog(t("Копировать поездку","Copy trip"),b);trackEditor(d,"copy",trip.id);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{if(name.getText().toString().trim().isEmpty()){name.setError(t("Введите название","Enter a name"));return;}long copy=repository.copyTrip(trip.id,name.getText().toString(),reset.isChecked());d.dismiss();openTrip(copy);})));d.show();}
     private void manageOwners(Trip trip){Trip fresh=repository.getTrip(trip.id);if(fresh==null)return;ArrayList<String> options=new ArrayList<>();options.add(t("＋ Добавить участника","＋ Add person"));options.add(t("＋ Добавить сумку","＋ Add bag"));for(Person p:fresh.people)options.add(t("Участник: ","Person: ")+p.name);for(Bag b:fresh.bags)options.add(t("Сумка: ","Bag: ")+b.name);new AlertDialog.Builder(this).setTitle(t("Участники и сумки","People and bags")).setItems(options.toArray(new String[0]),(d,i)->{if(i<2)ownerEditor(fresh,i==0,null,"");else if(i<2+fresh.people.size()){Person p=fresh.people.get(i-2);ownerActions(fresh,true,p.id,p.name);}else{Bag b=fresh.bags.get(i-2-fresh.people.size());ownerActions(fresh,false,b.id,b.name);}}).setNegativeButton(t("Готово","Done"),null).show();}
     private void ownerActions(Trip trip,boolean person,long id,String name){new AlertDialog.Builder(this).setTitle(name).setItems(new String[]{t("Переименовать","Rename"),t("Удалить (вещи останутся)","Delete (keep items)")},(d,i)->{if(i==0)ownerEditor(trip,person,id,name);else safe(()->{offerUndo(person?repository.deletePerson(trip.id,id):repository.deleteBag(trip.id,id));refresh(true);});}).show();}
     private void ownerEditor(Trip trip,boolean person,Long id,String old){LinearLayout b=form();EditText n=field(b,t("Название","Name"),old,R.id.owner_name,InputType.TYPE_CLASS_TEXT);AlertDialog d=dialog(person?t("Участник","Person"):t("Сумка","Bag"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String name=n.getText().toString().trim();if(name.isEmpty()){n.setError(t("Введите название","Enter a name"));return;}if(id==null){if(person)repository.addPerson(trip.id,name);else repository.addBag(trip.id,name);}else offerUndo(person?repository.updatePerson(trip.id,id,name):repository.updateBag(trip.id,id,name));d.dismiss();refresh(true);})));d.show();}
     public PackingRepository repositoryForTests(){return repository;}
     public long currentTripIdForTests(){return tripId;}
     private static final class Entry{final long id;final String type;final Object value;Entry(long i,String t,Object v){id=i;type=t;value=v;}}
+    private final class TripNavigation extends RecyclerView.Adapter<TripNavigation.Holder> {
+        TripNavigation(){setHasStableIds(true);}
+        @Override public int getItemCount(){return repository.listTrips().size();}
+        @Override public long getItemId(int position){return repository.listTrips().get(position).id;}
+        @Override public Holder onCreateViewHolder(ViewGroup parent,int type){LinearLayout box=column();box.setPadding(0,dp(4),0,dp(4));box.setLayoutParams(new RecyclerView.LayoutParams(-1,-2));Button open=button("",null);open.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);open.setPadding(dp(14),dp(12),dp(14),dp(12));box.addView(open,new LinearLayout.LayoutParams(-1,-2));return new Holder(box,open);}
+        @Override public void onBindViewHolder(Holder holder,int position){Trip trip=repository.listTrips().get(position);holder.open.setText(trip.title+"\n"+t("Собрано ","Packed ")+trip.packedCount()+" / "+trip.itemCount());holder.open.setContentDescription(t("Открыть поездку ","Open trip ")+trip.title);holder.open.setSelected(trip.id==tripId);holder.open.setBackground(round(trip.id==tripId?0xffdcebe3:Color.WHITE,14));holder.open.setOnClickListener(v->openTrip(trip.id));}
+        final class Holder extends RecyclerView.ViewHolder{final Button open;Holder(LinearLayout box,Button open){super(box);this.open=open;}}
+    }
     private final class Rows extends RecyclerView.Adapter<Rows.Holder>{
         final ArrayList<Entry> data=new ArrayList<>();Rows(){setHasStableIds(true);}
         @Override public int getItemCount(){return data.size();}@Override public long getItemId(int i){return data.get(i).id;}

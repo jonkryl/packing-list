@@ -89,7 +89,7 @@ public final class PackingJourneyTest {
             input(R.id.item_quantity, "3"); save();
 
             mainText("Passport × 1");
-            focusedView(withContentDescription("Item actions Passport")).perform(click());
+            focusedView(withContentDescription("Item actions Passport")).perform(fullyRevealMainTarget(), click());
             clickText("Delete item");
             assertEquals(2, trip(scenario).items.size());
             scenario.recreate();
