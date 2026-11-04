@@ -23,6 +23,7 @@ import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 import static androidx.test.espresso.Espresso.*;
 import static androidx.test.espresso.action.ViewActions.*;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
 import static org.hamcrest.Matchers.equalTo;
@@ -237,7 +238,12 @@ final class JourneySupport {
     }
 
     static void input(int id, String value) {
-        view(id).perform(scrollTo(), replaceText(value), androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
+        ViewInteraction field = view(id);
+        // The compact search dialog has no ScrollView; its input is already visible.
+        if (id == R.id.search_query) field.check(matches(isCompletelyDisplayed()));
+        else field.perform(scrollTo());
+        field.check(matches(isEnabled())).perform(replaceText(value),
+                androidx.test.espresso.action.ViewActions.closeSoftKeyboard());
     }
 
     static void save() {
