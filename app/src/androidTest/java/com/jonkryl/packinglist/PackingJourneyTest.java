@@ -68,7 +68,7 @@ public final class PackingJourneyTest {
             clickMainId("remaining_filter");
 
             clickMainId("search_button");
-            input(R.id.search_query, "BORIS day"); clickText("Search");
+            input(R.id.search_query, "BORIS day"); view(android.R.id.button1).perform(click());
             assertTrue(containsId(adapterIds(scenario), initial.items.get(1).id));
             assertFalse(containsId(adapterIds(scenario), initial.items.get(0).id));
             assertFalse(containsId(adapterIds(scenario), initial.items.get(2).id));
@@ -76,7 +76,7 @@ public final class PackingJourneyTest {
             assertFalse("Search remains applied after rotation", containsId(adapterIds(scenario), initial.items.get(0).id));
             clickMainId("search_button");
             view(R.id.search_query).check(matches(withText("BORIS day")));
-            clickText("Clear search");
+            view(android.R.id.button3).perform(click());
             assertTrue(containsId(adapterIds(scenario), initial.items.get(0).id));
             assertTrue(containsId(adapterIds(scenario), initial.items.get(2).id));
 
@@ -172,10 +172,10 @@ public final class PackingJourneyTest {
         addItem("Passport", "1", "Shared / no person", "No bag");
         long deletedId = trip(scenario).id;
         clickMainId("search_button");
-        input(R.id.search_query, "passport"); clickText("Search");
+        input(R.id.search_query, "passport"); view(android.R.id.button1).perform(click());
         clickMainId("remaining_filter");
         clickMainId("group_button"); clickText("By bag");
-        tripMenu("Filtered trip"); clickText("Delete trip"); clickText("Delete");
+        tripMenu("Filtered trip"); clickText("Delete trip"); view(android.R.id.button1).perform(click());
         scenario.onActivity(activity -> {
             assertEquals("Deleting the open trip returns to the trip list", -1L, activity.currentTripIdForTests());
             assertNull(activity.repositoryForTests().getTrip(deletedId));
