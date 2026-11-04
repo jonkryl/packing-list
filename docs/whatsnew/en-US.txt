@@ -1,0 +1,3 @@
+Find items by name, person or bag.
+Quickly undo an accidental packing checkmark.
+Search stays in place when the screen rotates. Improved empty-list messages.

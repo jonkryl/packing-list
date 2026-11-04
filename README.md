@@ -6,6 +6,8 @@ Trips, item quantities, people, bags and packing marks stay on the device. Templ
 
 The app menu lets users choose Russian, English or the system language. The active trip and pending undo survive Activity recreation. Undo stays in memory and is cleared when the app process ends.
 
+Within a trip, Find item searches item names, people and bags together and works with the remaining-items filter and grouping. Search survives Activity recreation and never changes the saved list or its export. Packing marks can be undone immediately, including when the marked item has disappeared from the remaining-items view.
+
 ## Build and verification
 
 The project uses Java 17, Android Gradle Plugin 8.13.2, Gradle 8.13 and Android SDK 36. The checked-in wrapper verifies the Gradle distribution SHA-256. Gradle is limited to two workers and a 2 GB JVM.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p ci-artifacts
-adb wait-for-device
+timeout 30s adb wait-for-device > ci-artifacts/initial-adb-wait.txt 2>&1
 device_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 font_scale_changed=false
 
@@ -46,19 +46,59 @@ adb install -r "$app_apk"
 adb install -r "$test_apk"
 adb shell pm clear com.jonkryl.packinglist
 
-# Google APIs test images are debuggable AOSP emulator images, with no user account.
-# Root avoids API 24's shell restriction on Wi-Fi controls and airplane-mode broadcasts.
-adb root > ci-artifacts/offline-adb-root.txt
-adb wait-for-device
-test "$(adb shell id -u | tr -d '\r')" = '0'
+# Google APIs CI emulator images are rootable; API 24 shell otherwise cannot toggle Wi-Fi.
+root_verified=false
+for root_attempt in 1 2 3; do
+    printf '\nRoot attempt %s\n' "$root_attempt" >> ci-artifacts/offline-adb-root.txt
+    # A successful daemon restart can close this command's connection before its reply arrives.
+    # Capture that error, reconnect with bounded waits, and trust only the actual shell UID.
+    if timeout 15s adb root >> ci-artifacts/offline-adb-root.txt 2>&1; then
+        root_command_status=0
+    else
+        root_command_status=$?
+    fi
+    printf 'adb root exit: %s\n' "$root_command_status" >> ci-artifacts/offline-adb-root.txt
+    if timeout 20s adb wait-for-device >> ci-artifacts/offline-adb-root.txt 2>&1; then
+        if root_uid="$(timeout 5s adb shell id -u 2>> ci-artifacts/offline-adb-root.txt | tr -d '\r\n')"; then
+            printf 'Observed shell UID: %s\n' "$root_uid" >> ci-artifacts/offline-adb-root.txt
+            if [ "$root_uid" = '0' ]; then
+                root_verified=true
+                break
+            fi
+        else
+            printf 'UID probe failed: %s\n' "$?" >> ci-artifacts/offline-adb-root.txt
+        fi
+    else
+        printf 'Device reconnect failed: %s\n' "$?" >> ci-artifacts/offline-adb-root.txt
+    fi
+    sleep 1
+done
+test "$root_verified" = true
+test "$(timeout 10s adb shell id -u 2>> ci-artifacts/offline-adb-root.txt | tr -d '\r\n')" = '0'
 adb shell svc wifi disable
-adb shell svc data disable
+adb shell service list > ci-artifacts/offline-services.txt 2> ci-artifacts/offline-services-stderr.txt
+if grep -Eq '^[[:space:]]*[0-9]+[[:space:]]+phone:[[:space:]]+\[com\.android\.internal\.telephony\.ITelephony\][[:space:]]*$' ci-artifacts/offline-services.txt; then
+    adb shell svc data disable > ci-artifacts/offline-mobile-data.txt 2> ci-artifacts/offline-mobile-data-stderr.txt
+else
+    # API 36 may list a placeholder "phone: []" without a usable ITelephony binder.
+    printf 'API %s has no usable ITelephony interface; emulator GSM data, Wi-Fi and airplane-mode controls remain required.\n' "$device_api" > ci-artifacts/offline-mobile-data.txt
+fi
 adb shell settings put global airplane_mode_on 1
 adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true > ci-artifacts/offline-airplane-mode.txt
 adb emu gsm data off > ci-artifacts/offline-emulator-data.txt
-adb shell dumpsys connectivity > ci-artifacts/offline-connectivity.txt
+# Radio shutdown is asynchronous. Require the real default network to disappear before testing.
+offline_confirmed=false
+for attempt in $(seq 1 15); do
+    adb shell dumpsys connectivity > ci-artifacts/offline-connectivity.txt
+    if grep -Eq '^Active default network: (none|null)[[:space:]]*$' ci-artifacts/offline-connectivity.txt; then
+        offline_confirmed=true
+        break
+    fi
+    sleep 1
+done
+test "$offline_confirmed" = true
 adb shell settings get global airplane_mode_on > ci-artifacts/offline-setting.txt
-
+test "$(tr -d '\r\n' < ci-artifacts/offline-setting.txt)" = '1'
 run_instrumentation() {
     local report="$1"
     shift

@@ -3,6 +3,7 @@ package com.jonkryl.packinglist.domain;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import static com.jonkryl.packinglist.domain.PackingModels.*;
@@ -12,8 +13,18 @@ public final class PackingLogic {
     private PackingLogic() {}
 
     public static List<Item> visibleItems(Trip trip, boolean remainingOnly, Grouping grouping) {
+        return visibleItems(trip, remainingOnly, grouping, "");
+    }
+
+    /** Searches only the current view; matching never changes the saved packing list. */
+    public static List<Item> visibleItems(Trip trip, boolean remainingOnly, Grouping grouping,
+                                          String query) {
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        String[] terms = normalized.isEmpty() ? new String[0] : normalized.split("\\s+");
         List<Item> result = new ArrayList<>();
-        for (Item item : trip.items) if (!remainingOnly || !item.packed) result.add(item);
+        for (Item item : trip.items) {
+            if ((!remainingOnly || !item.packed) && matches(trip, item, terms)) result.add(item);
+        }
         result.sort(Comparator.comparingLong(item -> item.order));
         if (grouping == Grouping.PERSON) {
             result.sort(Comparator.comparingInt(item -> personRank(trip, item.personId)));
@@ -25,7 +36,12 @@ public final class PackingLogic {
 
     public static List<ItemGroup> groups(Trip trip, boolean remainingOnly, Grouping grouping,
                                          boolean english) {
-        List<Item> visible = visibleItems(trip, remainingOnly, grouping);
+        return groups(trip, remainingOnly, grouping, english, "");
+    }
+
+    public static List<ItemGroup> groups(Trip trip, boolean remainingOnly, Grouping grouping,
+                                         boolean english, String query) {
+        List<Item> visible = visibleItems(trip, remainingOnly, grouping, query);
         List<ItemGroup> result = new ArrayList<>();
         if (grouping == Grouping.NONE) {
             if (!visible.isEmpty()) result.add(new ItemGroup("", null, visible));
@@ -46,6 +62,14 @@ public final class PackingLogic {
             result.add(new ItemGroup(groupLabel(trip, owner, grouping, english), owner, current));
         }
         return result;
+    }
+
+    private static boolean matches(Trip trip, Item item, String[] terms) {
+        if (terms.length == 0) return true;
+        String searchable = (item.name + " " + trip.personName(item.personId) + " "
+                + trip.bagName(item.bagId)).toLowerCase(Locale.ROOT);
+        for (String term : terms) if (!searchable.contains(term)) return false;
+        return true;
     }
 
     public static String exportText(Trip trip, boolean english) {

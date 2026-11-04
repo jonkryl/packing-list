@@ -30,6 +30,7 @@ public final class MainActivity extends ComponentActivity {
     private long tripId=-1;
     private boolean remaining=false;
     private Grouping grouping=Grouping.NONE;
+    private String query="";
     private RecyclerView list;
     private Rows adapter;
     private LinearLayout root, undoBar;
@@ -55,7 +56,7 @@ public final class MainActivity extends ComponentActivity {
         english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("ru");
         packingState=new ViewModelProvider(this,new PackingState.Factory(getApplication())).get(PackingState.class);
         repository=packingState.repository;
-        if(state!=null){ tripId=state.getLong("trip",-1); remaining=state.getBoolean("remaining"); grouping=Grouping.valueOf(state.getString("group","NONE")); }
+        if(state!=null){ tripId=state.getLong("trip",-1); remaining=state.getBoolean("remaining"); grouping=Grouping.valueOf(state.getString("group","NONE")); query=state.getString("query",""); }
         else tripId=getPreferences(0).getLong("trip",-1);
         tripBack=new OnBackPressedCallback(tripId>=0){
             @Override public void handleOnBackPressed(){goHome();}
@@ -79,7 +80,7 @@ public final class MainActivity extends ComponentActivity {
     @Override protected void onStart(){super.onStart();if(banner!=null)banner.onStart();}
     @Override protected void onStop(){if(banner!=null)banner.onStop();super.onStop();}
     @Override protected void onDestroy(){if(banner!=null)banner.destroy();super.onDestroy();}
-    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putLong("trip",tripId);b.putBoolean("remaining",remaining);b.putString("group",grouping.name());}
+    @Override protected void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putLong("trip",tripId);b.putBoolean("remaining",remaining);b.putString("group",grouping.name());b.putString("query",query);}
     private String t(String ru,String en){return english?en:ru;}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
@@ -87,13 +88,14 @@ public final class MainActivity extends ComponentActivity {
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private TextView text(String s,int size,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(INK);if(bold)v.setTypeface(null,Typeface.BOLD);v.setIncludeFontPadding(true);return v;}
     private Button button(String s,View.OnClickListener click){Button b=new Button(this);b.setText(s);b.setTextSize(16);b.setAllCaps(false);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setTextColor(TEAL);b.setOnClickListener(click);return b;}
-    private void goHome(){tripId=-1;remaining=false;refresh(false);}
-    private void openTrip(long id){tripId=id;remaining=false;grouping=Grouping.NONE;refresh(false);}
+    private void resetTripFilters(){remaining=false;grouping=Grouping.NONE;query="";}
+    private void goHome(){tripId=-1;resetTripFilters();refresh(false);}
+    private void openTrip(long id){tripId=id;resetTripFilters();refresh(false);}
     private void refresh(boolean keepScroll){
         LinearLayoutManager layout=(LinearLayoutManager)list.getLayoutManager();
         int oldFirst=keepScroll?layout.findFirstVisibleItemPosition():-1; int offset=0;ArrayList<Long> oldIds=new ArrayList<>();
         if(oldFirst>=0){View anchor=layout.findViewByPosition(oldFirst);if(anchor!=null)offset=anchor.getTop()-list.getPaddingTop();for(Entry e:adapter.data)oldIds.add(e.id);}
-        Trip trip=tripId>=0?repository.getTrip(tripId):null;if(tripId>=0&&trip==null)tripId=-1;
+        Trip trip=tripId>=0?repository.getTrip(tripId):null;if(tripId>=0&&trip==null){tripId=-1;resetTripFilters();}
         tripBack.setEnabled(tripId>=0);
         getPreferences(0).edit().putLong("trip",tripId).apply();
         title.setText(t("Собрано","Packed")); back.setVisibility(tripId>=0?View.VISIBLE:View.GONE);
@@ -101,8 +103,8 @@ public final class MainActivity extends ComponentActivity {
         adapter.data.clear();
         if(tripId<0){adapter.data.add(new Entry(-1,"intro",null));for(Trip v:repository.listTrips())adapter.data.add(new Entry(v.id,"trip",v));if(repository.listTrips().isEmpty())adapter.data.add(new Entry(-2,"empty",t("Начните с поездки. Шаблон можно полностью изменить.","Start with a trip. Every template is fully editable.")));}
         else {adapter.data.add(new Entry(-1,"hero",trip));adapter.data.add(new Entry(-2,"filters",trip));
-            for(ItemGroup g:PackingLogic.groups(trip,remaining,grouping,english)){if(grouping!=Grouping.NONE)adapter.data.add(new Entry(-100000-(g.ownerId==null?0:g.ownerId),"group",g.label));for(Item i:g.items)adapter.data.add(new Entry(i.id,"item",i));}
-            if(PackingLogic.visibleItems(trip,remaining,grouping).isEmpty())adapter.data.add(new Entry(-3,"empty",remaining?t("Всё собрано. Можно выдохнуть.","Everything is packed. Take a breath."):t("Добавьте первую вещь.","Add your first item.")));
+            for(ItemGroup g:PackingLogic.groups(trip,remaining,grouping,english,query)){if(grouping!=Grouping.NONE)adapter.data.add(new Entry(-100000-(g.ownerId==null?0:g.ownerId),"group",g.label));for(Item i:g.items)adapter.data.add(new Entry(i.id,"item",i));}
+            if(PackingLogic.visibleItems(trip,remaining,grouping,query).isEmpty())adapter.data.add(new Entry(-3,"empty",emptyMessage(trip)));
         }
         adapter.notifyDataSetChanged();
         int target=-1;if(oldFirst>=0){for(int j=oldFirst;j<oldIds.size()&&target<0;j++)target=rowIndex(oldIds.get(j));for(int j=oldFirst-1;j>=0&&target<0;j--)target=rowIndex(oldIds.get(j));}
@@ -130,8 +132,40 @@ public final class MainActivity extends ComponentActivity {
     private void tripEditor(Trip trip){LinearLayout b=form();EditText name=field(b,t("Название поездки","Trip name"),trip==null?"":trip.title,R.id.trip_name,InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         EditText start=field(b,t("Начало · ГГГГ-ММ-ДД (необязательно)","Start · YYYY-MM-DD (optional)"),trip==null?"":trip.startDate,R.id.start_date,InputType.TYPE_CLASS_DATETIME);EditText end=field(b,t("Конец · ГГГГ-ММ-ДД (необязательно)","End · YYYY-MM-DD (optional)"),trip==null?"":trip.endDate,R.id.end_date,InputType.TYPE_CLASS_DATETIME);
         Spinner templates=new Spinner(this);if(trip==null){b.addView(text(t("Стартовый список","Start with"),14,true));templates.setId(R.id.template_spinner);templates.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{t("Пустой список","Empty list"),t("Выходные","Weekend"),t("Рабочая поездка","Business trip"),t("С детьми","With kids")}));b.addView(templates,new LinearLayout.LayoutParams(-1,dp(56)));b.addView(text(t("Все вещи, участники и сумки можно менять.","All items, people and bags can be changed."),14,false));}
-        AlertDialog d=dialog(trip==null?t("Новая поездка","New trip"):t("Изменить поездку","Edit trip"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim(),s=start.getText().toString().trim(),e=end.getText().toString().trim();if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}if(!validDate(s)||!validDate(e)||(!s.isEmpty()&&!e.isEmpty()&&s.compareTo(e)>0)){end.setError(t("Проверьте даты","Check dates"));return;}if(trip==null){tripId=repository.createTrip(n,s,e,Template.values()[templates.getSelectedItemPosition()],english);}else offerUndo(repository.updateTrip(trip.id,n,s,e));d.dismiss();refresh(false);})));d.show();}
+        AlertDialog d=dialog(trip==null?t("Новая поездка","New trip"):t("Изменить поездку","Edit trip"),b);d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->safe(()->{String n=name.getText().toString().trim(),s=start.getText().toString().trim(),e=end.getText().toString().trim();if(n.isEmpty()){name.setError(t("Введите название","Enter a name"));return;}if(!validDate(s)||!validDate(e)||(!s.isEmpty()&&!e.isEmpty()&&s.compareTo(e)>0)){end.setError(t("Проверьте даты","Check dates"));return;}if(trip==null){tripId=repository.createTrip(n,s,e,Template.values()[templates.getSelectedItemPosition()],english);resetTripFilters();}else offerUndo(repository.updateTrip(trip.id,n,s,e));d.dismiss();refresh(false);})));d.show();}
     private boolean validDate(String s){if(s.isEmpty())return true;try{LocalDate.parse(s);return s.matches("\\d{4}-\\d{2}-\\d{2}");}catch(Exception e){return false;}}
+    private String emptyMessage(Trip trip) {
+        if (trip.itemCount() == 0) return t("Добавьте первую вещь.", "Add your first item.");
+        if (!query.isEmpty()) return remaining
+                ? t("Среди несобранных вещей совпадений нет. Измените или сбросьте поиск.",
+                    "No remaining items match. Change or clear the search.")
+                : t("Ничего не найдено. Измените или сбросьте поиск.",
+                    "No items match. Change or clear the search.");
+        return t("Всё собрано. Можно выдохнуть.", "Everything is packed. Take a breath.");
+    }
+    private void searchItems() {
+        LinearLayout box = form();
+        EditText input = field(box, t("Название вещи, участник или сумка", "Item name, person or bag"),
+                query, R.id.search_query, InputType.TYPE_CLASS_TEXT);
+        input.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(160)});
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(t("Найти вещь", "Find item"))
+                .setView(box).setNegativeButton(t("Отмена", "Cancel"), null)
+                .setNeutralButton(t("Сбросить поиск", "Clear search"), null)
+                .setPositiveButton(t("Найти", "Search"), null).create();
+        dialog.setOnShowListener(shown -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                query = input.getText().toString().trim();
+                dialog.dismiss();
+                refresh(false);
+            });
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> {
+                query = "";
+                dialog.dismiss();
+                refresh(false);
+            });
+        });
+        dialog.show();
+    }
     private void itemEditor(Item item){Trip trip=repository.getTrip(tripId);if(trip==null)return;LinearLayout b=form();EditText name=field(b,t("Название вещи","Item name"),item==null?"":item.name,R.id.item_name,InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);EditText quantity=field(b,t("Количество","Quantity"),item==null?"1":String.valueOf(item.quantity),R.id.item_quantity,InputType.TYPE_CLASS_NUMBER);
         ArrayList<Long> personIds=new ArrayList<>(),bagIds=new ArrayList<>();ArrayList<String> people=new ArrayList<>(),bags=new ArrayList<>();personIds.add(null);people.add(t("Общее / без участника","Shared / no person"));bagIds.add(null);bags.add(t("Без сумки","No bag"));for(Person p:trip.people){personIds.add(p.id);people.add(p.name);}for(Bag a:trip.bags){bagIds.add(a.id);bags.add(a.name);}
         Spinner person=select(b,t("Участник","Person"),people,R.id.person_spinner),bag=select(b,t("Сумка","Bag"),bags,R.id.bag_spinner);if(item!=null){person.setSelection(Math.max(0,personIds.indexOf(item.personId)));bag.setSelection(Math.max(0,bagIds.indexOf(item.bagId)));}
@@ -162,8 +196,8 @@ public final class MainActivity extends ComponentActivity {
             else if(e.type.equals("trip")||e.type.equals("hero")){Trip v=(Trip)e.value;LinearLayout card=column();card.setPadding(dp(16),dp(14),dp(16),dp(14));card.setBackground(round(Color.WHITE,18));LinearLayout header=row();TextView n=text(v.title,e.type.equals("hero")?26:22,true);header.addView(n,new LinearLayout.LayoutParams(0,-2,1));Button more=button("⋮",b->tripMenu(v,b));more.setContentDescription(t("Действия с поездкой ","Trip actions ")+v.title);header.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));card.addView(header);
                 if(!v.startDate.isEmpty()||!v.endDate.isEmpty())card.addView(text(v.startDate+(v.endDate.isEmpty()?"":" — "+v.endDate),14,false));int packed=0;for(Item i:v.items)if(i.packed)packed++;card.addView(text(t("Собрано ","Packed ")+packed+" / "+v.items.size(),16,true));ProgressBar progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(Math.max(1,v.items.size()));progress.setProgress(packed);card.addView(progress,new LinearLayout.LayoutParams(-1,dp(12)));
                 if(e.type.equals("trip")){Button open=button(t("Открыть список →","Open list →"),b->openTrip(v.id));card.addView(open);}else{Button owners=button(t("Участники и сумки","People and bags"),b->manageOwners(v));owners.setId(R.id.owners_button);card.addView(owners);Button share=button(t("Поделиться списком","Share list"),b->shareTrip(v));share.setId(R.id.share_button);card.addView(share);}box.addView(card);}
-            else if(e.type.equals("filters")){CheckBox filter=new CheckBox(MainActivity.this);filter.setId(R.id.remaining_filter);filter.setText(t("Осталось собрать","Remaining to pack"));filter.setTextSize(16);filter.setMinHeight(dp(48));filter.setChecked(remaining);filter.setOnCheckedChangeListener((b,c)->{remaining=c;refresh(true);});box.addView(filter);Button group=button(t("Группировка: ","Group: ")+(grouping==Grouping.NONE?t("по порядку","in order"):grouping==Grouping.PERSON?t("по участнику","by person"):t("по сумке","by bag")),v->new AlertDialog.Builder(MainActivity.this).setTitle(t("Группировка","Group items")).setSingleChoiceItems(new String[]{t("По порядку","In order"),t("По участнику","By person"),t("По сумке","By bag")},grouping.ordinal(),(d,i)->{grouping=Grouping.values()[i];d.dismiss();refresh(false);}).show());group.setId(R.id.group_button);box.addView(group);}
-            else if(e.type.equals("item")){Item i=(Item)e.value;LinearLayout r=row();r.setPadding(dp(8),dp(6),dp(4),dp(6));r.setBackground(round(i.packed?0xffe5eee6:Color.WHITE,14));CheckBox mark=new CheckBox(MainActivity.this);mark.setChecked(i.packed);mark.setMinHeight(dp(48));mark.setContentDescription(t("Собрано: ","Packed: ")+i.name+" × "+i.quantity+" · "+(trip.personName(i.personId).isEmpty()?t("Общее","Shared"):trip.personName(i.personId))+" · "+(trip.bagName(i.bagId).isEmpty()?t("Без сумки","No bag"):trip.bagName(i.bagId)));mark.setTag("packed_"+i.id);mark.setOnCheckedChangeListener((b,c)->safe(()->{repository.setPacked(tripId,i.id,c);refresh(true);}));r.addView(mark,new LinearLayout.LayoutParams(dp(48),-2));LinearLayout detail=column();TextView n=text(i.name+" × "+i.quantity,18,true);detail.addView(n);String person=trip.personName(i.personId),bag=trip.bagName(i.bagId);TextView metadata=text((person.isEmpty()?t("Общее","Shared"):person)+" · "+(bag.isEmpty()?t("Без сумки","No bag"):bag),14,false);metadata.setTextColor(MUTED);detail.addView(metadata);detail.setOnClickListener(v->itemEditor(i));detail.setPadding(0,dp(4),0,dp(4));detail.setMinimumHeight(dp(48));r.addView(detail,new LinearLayout.LayoutParams(0,-2,1));Button more=button("⋮",v->itemMenu(i,v));more.setContentDescription(t("Действия с вещью ","Item actions ")+i.name);r.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(r);}
+            else if(e.type.equals("filters")){Button search=button(query.isEmpty()?t("Найти вещь","Find item"):t("Поиск: ","Search: ")+query,v->searchItems());search.setId(R.id.search_button);box.addView(search);CheckBox filter=new CheckBox(MainActivity.this);filter.setId(R.id.remaining_filter);filter.setText(t("Осталось собрать","Remaining to pack"));filter.setTextSize(16);filter.setMinHeight(dp(48));filter.setChecked(remaining);filter.setOnCheckedChangeListener((b,c)->{remaining=c;refresh(true);});box.addView(filter);Button group=button(t("Группировка: ","Group: ")+(grouping==Grouping.NONE?t("по порядку","in order"):grouping==Grouping.PERSON?t("по участнику","by person"):t("по сумке","by bag")),v->new AlertDialog.Builder(MainActivity.this).setTitle(t("Группировка","Group items")).setSingleChoiceItems(new String[]{t("По порядку","In order"),t("По участнику","By person"),t("По сумке","By bag")},grouping.ordinal(),(d,i)->{grouping=Grouping.values()[i];d.dismiss();refresh(false);}).show());group.setId(R.id.group_button);box.addView(group);}
+            else if(e.type.equals("item")){Item i=(Item)e.value;LinearLayout r=row();r.setPadding(dp(8),dp(6),dp(4),dp(6));r.setBackground(round(i.packed?0xffe5eee6:Color.WHITE,14));CheckBox mark=new CheckBox(MainActivity.this);mark.setChecked(i.packed);mark.setMinHeight(dp(48));mark.setContentDescription(t("Собрано: ","Packed: ")+i.name+" × "+i.quantity+" · "+(trip.personName(i.personId).isEmpty()?t("Общее","Shared"):trip.personName(i.personId))+" · "+(trip.bagName(i.bagId).isEmpty()?t("Без сумки","No bag"):trip.bagName(i.bagId)));mark.setTag("packed_"+i.id);mark.setOnCheckedChangeListener((b,c)->safe(()->{offerUndo(repository.setPacked(tripId,i.id,c));refresh(true);}));r.addView(mark,new LinearLayout.LayoutParams(dp(48),-2));LinearLayout detail=column();TextView n=text(i.name+" × "+i.quantity,18,true);detail.addView(n);String person=trip.personName(i.personId),bag=trip.bagName(i.bagId);TextView metadata=text((person.isEmpty()?t("Общее","Shared"):person)+" · "+(bag.isEmpty()?t("Без сумки","No bag"):bag),14,false);metadata.setTextColor(MUTED);detail.addView(metadata);detail.setOnClickListener(v->itemEditor(i));detail.setPadding(0,dp(4),0,dp(4));detail.setMinimumHeight(dp(48));r.addView(detail,new LinearLayout.LayoutParams(0,-2,1));Button more=button("⋮",v->itemMenu(i,v));more.setContentDescription(t("Действия с вещью ","Item actions ")+i.name);r.addView(more,new LinearLayout.LayoutParams(dp(48),dp(48)));box.addView(r);}
         }
         final class Holder extends RecyclerView.ViewHolder{final LinearLayout box;Holder(LinearLayout v){super(v);box=v;}}
     }

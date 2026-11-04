@@ -15,8 +15,8 @@ android {
         applicationId = "com.jonkryl.packinglist"
         minSdk = 24
         targetSdk = 36
-        versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()
-        versionName = providers.gradleProperty("versionName").orElse("1.0.0").get()
+        versionCode = providers.gradleProperty("versionCode").orElse("3").get().toInt()
+        versionName = providers.gradleProperty("versionName").orElse("1.0.2").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "PRIVACY_POLICY_URL", "\"https://jonkryl.github.io/packing-list/privacy/\"")
     }
@@ -71,6 +71,11 @@ tasks.configureEach {
 }
 
 dependencies {
+    constraints {
+        implementation("androidx.fragment:fragment:1.2.5") {
+            because("Keep transitive ad SDK dependencies above the Fragment 1.1.0 version deprecated by Google Play.")
+        }
+    }
     implementation("io.appmetrica.analytics:analytics:8.5.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.activity:activity:1.11.0")
