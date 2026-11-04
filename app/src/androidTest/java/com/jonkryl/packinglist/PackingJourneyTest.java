@@ -48,7 +48,7 @@ public final class PackingJourneyTest {
             mainText("Bottle × 1");
             long[] idsBefore = adapterIds(scenario);
             long packedId = initial.items.get(0).id;
-            focusedView(withTagValue(is("packed_" + packedId))).perform(click());
+            clickPackingMark(packedId);
             assertTrue(trip(scenario).items.get(0).packed);
             assertArrayEquals("Packing marks must retain row IDs and order", idsBefore, adapterIds(scenario));
             screenshot("01-en-trip");
@@ -63,7 +63,7 @@ public final class PackingJourneyTest {
             assertFalse("Undo restores an accidentally packed item after rotation", trip(scenario).items.get(0).packed);
             assertTrue("Undo brings the item back while the remaining filter stays enabled", containsId(adapterIds(scenario), packedId));
             mainText("Bottle × 1");
-            focusedView(withTagValue(is("packed_" + packedId))).perform(click());
+            clickPackingMark(packedId);
             assertTrue(trip(scenario).items.get(0).packed);
             clickMainId("remaining_filter");
 

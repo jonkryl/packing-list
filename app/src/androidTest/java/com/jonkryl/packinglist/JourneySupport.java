@@ -211,6 +211,12 @@ final class JourneySupport {
                 .perform(fullyRevealMainTarget());
     }
 
+    static void clickPackingMark(long itemId) {
+        focusedView(allOf(withTagValue(equalTo("packed_" + itemId)),
+                isDescendantOfA(withId(R.id.main_list))))
+                .perform(fullyRevealMainTarget(), click());
+    }
+
     static void mainId(String value) throws Exception {
         assertTrue("Packing control is absent: " + value,
                 scrollable(new UiSelector().resourceId(PACKAGE + ":id/main_list"))
