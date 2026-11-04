@@ -164,7 +164,7 @@ final class JourneySupport {
         return new Rect(origin[0], origin[1], origin[0] + target.getWidth(), origin[1] + target.getHeight());
     }
 
-    private static ViewAction fullyRevealMainTarget() {
+    static ViewAction fullyRevealMainTarget() {
         return new ViewAction() {
             @Override public Matcher<View> getConstraints() {
                 return isDescendantOfA(withId(R.id.main_list));
